@@ -59,7 +59,7 @@ def RKCash_Karp(x, y, dx, p):
 @nb.jit(nopython=True)
 def RKCK_step(x, y, dx, p):
     dx_try = dx
-    for i in range(10):
+    for i in range(20):
         x_next, y5, y4 = RKCash_Karp(x, y, dx_try, p)
         dx_try, done = step_accept(y, y5, y4, dx_try)
         if done:
@@ -71,7 +71,7 @@ def RKCK_step(x, y, dx, p):
     return x_next, y5, dx_try
     
 eps = 1e-8
-TINY = 1e-40
+TINY = 1e-22
 Safety = 0.9
 
 @nb.jit(nopython=True)
