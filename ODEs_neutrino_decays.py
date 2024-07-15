@@ -144,25 +144,21 @@ def compute_evolution(energies_cm:np.ndarray):
     T_all = np.concatenate((T_all , result_mod[1][:,-1][1:]))
     da_all = np.concatenate((da_all, result_mod[2][1:]))
     results.append(result_mod)
-    return a_all, freqs, ns_all, t_all, T_all, da_all
+    eps = [energies_cm] * len(a_all)
+    return a_all, freqs, eps, ns_all, t_all, T_all, da_all
 
 """
 ** This can be used to check outputs
+
 num = get_bins(a_end=a_end)
 energies_cm = np.linspace(0, (sterile_mass + 1) / (2 * temp_end) , num)
-a_all, freqs, ns_all, t_all, T_all, da_all = compute_evolution(energies_cm=energies_cm)
+a_all, freqs, eps, ns_all, t_all, T_all, da_all = compute_evolution(energies_cm=energies_cm)
 comoving = [1 / a for a in a_all]
-# Define the data to be written to the CSV file
-data = [[a_all[i], ns_all[i], t_all[i], T_all[i], da_all[i]] for i in range(len(a_all))]
-fields = ['a','ns','t','T','da']
-data.insert(0,fields)
+fe = freqs[:][:,:num]
+print(len(fe[0]))
 # Specify the file name
-filename = 'standard.csv'
-
-# Write data to the CSV file with a pipe delimiter
-with open(filename, 'w', newline='') as csvfile:
-    csvwriter = csv.writer(csvfile, delimiter=',')
-    csvwriter.writerows(data)
+filename = "mass-300-life-1.004.npz"
+np.savez(filename, a=a_all, fe=fe, e=eps, ns=ns_all, t=t_all, T=T_all)
 plt.loglog(comoving, T_all)
 plt.loglog(comoving,comoving)
 plt.show()
