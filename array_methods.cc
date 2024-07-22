@@ -5,6 +5,7 @@
 #include <complex>
 #include <iomanip>
 #include "gl_vals.hh"
+#include "gel_vals.hh"
 
 using std::cout;
 using std::endl;
@@ -32,7 +33,6 @@ dep_vars::dep_vars(dep_vars* copy_me)
     values = new double[N]();
     for (int i = 0; i < N; i++)
         values[i] = copy_me->get_value(i);
-        //values[i] = copy_me->values[i];
 }
     
 dep_vars::~dep_vars()
@@ -265,6 +265,13 @@ gl_dummy_vars::gl_dummy_vars(int num_gl):dummy_vars(num_gl)
     }
 }
 
+gel_dummy_vars::gel_dummy_vars(double start, double end):dummy_vars(100)
+{
+    for(int i = 0; i < 100; i++){
+        values[i] = gel_vals[i];
+        weights[i] = gel_weights[i] * (end - start) / 2;
+    }
+}
 
 //linspace_and_gl
 linspace_and_gl::linspace_and_gl(double xmin, double xmax, int numlin, int num_gl):dummy_vars(numlin+num_gl)
@@ -378,7 +385,7 @@ complex<double> complex_three_vector::get_value(int i){
     return values[i];
 }
 
-void complex_three_vector::set_value(complex<double> d, int i){
+void complex_three_vector::set_value(int i, complex<double> d){
     values[i] = d;    
 }
 

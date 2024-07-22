@@ -37,6 +37,12 @@ class gl_dummy_vars : public dummy_vars
     gl_dummy_vars(int);
 };
 
+class gel_dummy_vars : public dummy_vars
+{
+    public:
+    gel_dummy_vars(double, double);
+};
+
 class linspace_and_gl : public dummy_vars
 {
     protected:
@@ -156,7 +162,7 @@ class complex_three_vector{
     
     void print_all();
     complex<double> get_value(int);
-    void set_value(complex<double>, int);
+    void set_value(int, complex<double>);
     void make_complex(three_vector*);
 
     void multiply_by(complex<double>);
@@ -169,6 +175,5 @@ class complex_three_vector{
     ~complex_three_vector();
     
 };
-
 
 #endif
