@@ -49,7 +49,7 @@ def RKCash_Karp(x, y, dx, p):
     k4 = dx * f(x + a4*dx, y + b41*k1 + b42*k2 +b43*k3, p)
     k5 = dx * f(x + a5*dx, y + b51*k1 + b52*k2 + b53*k3 + b54*k4, p)
     k6 = dx * f(x + a6*dx, y + b61*k1 + b62*k2 + b63*k3 + b64*k4 + b65*k5, p)
-    
+
     y_5th = y + c1*k1 + c2*k2 + c3*k3 + c4*k4 + c5*k5 + c6*k6 
     y_4th = y + cstar1*k1 + cstar2*k2 + cstar3*k3 + cstar4*k4 + cstar5*k5 + cstar6*k6 
     x_stepped = x + dx
@@ -59,7 +59,7 @@ def RKCash_Karp(x, y, dx, p):
 @nb.jit(nopython=True)
 def RKCK_step(x, y, dx, p):
     dx_try = dx
-    for i in range(20):
+    for i in range(10):
         x_next, y5, y4 = RKCash_Karp(x, y, dx_try, p)
         dx_try, done = step_accept(y, y5, y4, dx_try)
         if done:
@@ -80,6 +80,7 @@ def step_accept(y, y5, y4, dx):
     delta0 = eps * (np.abs(y) + np.abs(y5-y)) + TINY
     
     dsm = np.max(delta1/delta0)
+    #print(dsm)
     if dsm == 0:
         dx_new = 5 * dx
         return dx_new, True

@@ -3,6 +3,7 @@ import numba as nb
 import numpy.polynomial.laguerre as lg
 import decays
 
+
 num_points = 100
 sample_points, weights = lg.laggauss(num_points)
 
@@ -29,10 +30,9 @@ def f(a:float, y:np.ndarray, p:np.ndarray):
     for i, energy in enumerate(p[:-2]):
         cube[i] = energy ** 3 
     for i in range(6):
-        integrand = np.multiply(cube, y[i * length: (i + 1) * length])
+        integrand = neutrino_multiplier * np.multiply(cube, y[i * length: (i + 1) * length])
         add_term = np.trapz(integrand, p[:-2])
-        neutrino_energy_density += neutrino_multiplier * add_term
-
+        neutrino_energy_density += add_term
     # electron-positron contribution
     e_multiplier = 2 * (temp ** 4) / (np.pi ** 2)
     x = electron_mass / temp
@@ -45,6 +45,7 @@ def f(a:float, y:np.ndarray, p:np.ndarray):
     # dns/da calculations
     lifetime = decays.compute_lifetime(sterile_mass=sterile_mass, mixing_angle=mixing_angle)
     der[-3] = -(1 / lifetime) * ns * der[-2] - 3 * ns / a
+    
     
     # df/da calculations
     e, ae, m, am, t, at = decays.compute_full_term(energies_cm=p[:-2],sterile_mass=sterile_mass, temp_cm= 1 / a, mixing_angle=mixing_angle)
@@ -106,6 +107,7 @@ def f(a:float, y:np.ndarray, p:np.ndarray):
     num = term_0 - 3 * (a ** 2) * (term_1 + term_2)
     denom = (a ** 3) * (term_3 + term_4 + term_5)
     der[-1] = num / denom
+    #print(der[205])
     return der
 
 

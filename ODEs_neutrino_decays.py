@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import ODESolve as ODE
 import decays
 import csv
-
+import derivatives
 
 sterile_mass = 300
 mixing_angle = 1.22e-5
@@ -12,7 +12,7 @@ electron_mass = 0.511
 muon_mass = 105.658
 neutral_pion_mass = 134.9768
 charged_pion_mass = 139.57039
-a_end = 1
+a_end = 20
 temp_end = 1 / a_end
 
 
@@ -46,12 +46,12 @@ def get_a_separations(energies_cm:np.ndarray):
     nenergy42 = neutrino_max_energy_muon * (gamma_pion_e * (1 + pion_speed_e) * gamma_muon4 * (1 + muon_speed4))
     for energy in energies_cm:
         a_separations.append(energy / nenergy1)
-        if sterile_mass > neutral_pion_mass:
+        if sterile_mass >= neutral_pion_mass:
             a_separations.append(energy / nenergy2)
         if sterile_mass >= (charged_pion_mass + electron_mass):
             a_separations.append(energy / min_energy_e)
             a_separations.append(energy / max_energy_e)
-            #a_separations.append(energy / nenergy42)
+            a_separations.append(energy / nenergy42)
         if sterile_mass >= (charged_pion_mass + muon_mass):
             a_separations.append(energy / nenergy3)
             a_separations.append(energy / nenergy32)
@@ -63,7 +63,7 @@ def get_a_separations(energies_cm:np.ndarray):
     for i in range(len(a_separations) - 1):
         if a_separations[i] > a_end:
             a_separations[i] = a_end
-        if a_separations[i] <= 1/ 10 or np.abs(a_separations[i] - a_separations[i + 1]) <= 1e-6 or a_separations[i] == a_end:
+        if a_separations[i] <= 1/ 10 or a_separations[i] == a_end:
             removes.append(a_separations[i])
     if a_separations[-1] > a_end:
         a_separations.remove(a_separations[-1])
@@ -91,7 +91,7 @@ def compute_evolution(energies_cm:np.ndarray):
 
     fe = np.exp(-energies_cm) / (np.exp(-energies_cm) + 1)
     y0 = np.zeros(6 * num_bins + 3)
-    for i in range(5):
+    for i in range(6):
         y0[i * num_bins:(i+1)* num_bins]=fe
     y0[-3] = ns0
     y0[-2] = t0
@@ -108,13 +108,11 @@ def compute_evolution(energies_cm:np.ndarray):
     t_all = results[0][1][:,-2]
     T_all = results[0][1][:,-1]
     da_all = results[0][2]
-    
-
-    for i in range(len(a_separations) - 1):
+    for i in range(len(a_separations) - 1): #range(len(a_separations) - 1)
         a0 = a_separations[i] + 1e-14
         da0 = results[-1][2][-1]
         y0 = np.zeros(6 * num_bins + 3)
-        for j in range(5):
+        for j in range(6):
             y0[j * num_bins:(j+1)* num_bins]=results[i][1][-1,j * num_bins:(j+1)* num_bins]
         y0[-3] = results[i][1][-1,-3]
         y0[-2] = results[i][1][-1,-2]
@@ -127,11 +125,11 @@ def compute_evolution(energies_cm:np.ndarray):
         T_all = np.concatenate((T_all , result_mod[1][:,-1][1:]))
         da_all = np.concatenate((da_all, result_mod[2][1:]))
         results.append(result_mod)
-
-    a0 = a_separations[-1] + 1e-15
+    
+    a0 = a_separations[-1] + 1e-14
     da0 = results[-1][2][-1]
     y0 = np.zeros(6 * num_bins + 3)
-    for j in range(5):
+    for j in range(6):
         y0[j * num_bins:(j+1)* num_bins]=results[j][1][-1,j * num_bins:(j+1)* num_bins]
     y0[-3] = results[-1][1][-1,-3]
     y0[-2] = results[-1][1][-1,-2]
@@ -150,15 +148,41 @@ def compute_evolution(energies_cm:np.ndarray):
 """
 ** This can be used to check outputs
 
-num = get_bins(a_end=a_end)
-energies_cm = np.linspace(0, (sterile_mass + 1) / (2 * temp_end) , num)
+num = get_bins(a_end)
+energies_cm = np.linspace(0, (sterile_mass + 1) / (2 * 0.1) , num)
+a_seps = get_a_separations(energies_cm)
+print(f'Length:{len(a_seps)}')
+a0 = 1 / 10
+da0 = 0.01 * a0
+t0 = 0
+temp0 = 1 / a0
+num_bins = len(energies_cm)
+
+# calculating initial sterile neutrino number density
+gwd = 10.75
+gsdec = 61.75
+zeta3 = 1.2020569031595942853
+multiplier = 3 * zeta3 / (2 * np.pi ** 2)
+ns0 =  gwd * multiplier * (temp0 ** 3) / gsdec
+
+fe = np.exp(-energies_cm) / (np.exp(-energies_cm) + 1)
+y0 = np.zeros(6 * num_bins + 3)
+for i in range(6):
+    y0[i * num_bins:(i+1)* num_bins]=fe
+y0[-3] = ns0
+y0[-2] = t0
+y0[-1] = temp0
+
+p = np.zeros(len(energies_cm) + 2)
+p[0:-2] = energies_cm
+p[-2] = sterile_mass
+p[-1] = np.sin(mixing_angle) ** 2
 a_all, freqs, eps, ns_all, t_all, T_all, da_all = compute_evolution(energies_cm=energies_cm)
 comoving = [1 / a for a in a_all]
 fe = freqs[:][:,:num]
-print(len(fe[0]))
 # Specify the file name
-filename = "mass-300-life-1.004.npz"
-np.savez(filename, a=a_all, fe=fe, e=eps, ns=ns_all, t=t_all, T=T_all)
+#filename = "mass-300-life-1.004.npz"
+#np.savez(filename, a=a_all, fe=fe, e=eps, ns=ns_all, t=t_all, T=T_all)
 plt.loglog(comoving, T_all)
 plt.loglog(comoving,comoving)
 plt.show()
@@ -169,5 +193,5 @@ plt.show()
 plt.plot(t_all,a_all)
 plt.show()
 print((comoving[-1] / T_all[-1]))
-print(max(t_all) / (1.52e21))"""
-
+print(max(t_all) / (1.52e21))
+"""

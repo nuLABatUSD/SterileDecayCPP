@@ -7,7 +7,7 @@ num_points = 100
 sample_points, weights = lg.leggauss(num_points)
 
 # energy binning for testing
-num_bins = 100
+num_bins = 1000
 
 # particle masses and constants in MeV
 fermi = 1.16637e-11
@@ -285,7 +285,7 @@ def get_decay_type_one(decay_rate:float, energy:float, width:float, sterile_mass
     """
     neutrino_energy = get_decay_monoenergy(m0=sterile_mass, m2=product_mass)
     ddecay_rate = 0
-    if energy <= neutrino_energy <= energy + width:
+    if energy < neutrino_energy <= energy + width:
         ddecay_rate = decay_rate / width
     return ddecay_rate
 
@@ -319,7 +319,7 @@ def get_decay_type_two(decay_rate:float, energy:float, sterile_mass:float, mass_
     neutrino_energy_pion = get_decay_monoenergy(m0=charged_pion_mass, m2=muon_mass)
     min_energy = gamma_pion * neutrino_energy_pion * (1 - pion_speed)
     max_energy = gamma_pion * neutrino_energy_pion * (1 + pion_speed)
-    if min_energy <= energy <= max_energy:
+    if min_energy < energy <= max_energy:
         ddecay_rate = decay_rate / (2 * gamma_pion * pion_speed * neutrino_energy_pion)
     return ddecay_rate
 
@@ -500,8 +500,8 @@ def compute_dPdtdE(energies_cm:np.ndarray, sterile_mass:float, temp_cm:float, mi
     d4_2s = np.zeros_like(energy_bins)
     d4_3s = np.zeros_like(energy_bins)
     d4_4s = np.zeros_like(energy_bins)
-    d3s = np.zeros_like(energy_bins)
-    d4s = np.zeros_like(energy_bins)
+    #d3s = np.zeros_like(energy_bins)
+    #d4s = np.zeros_like(energy_bins)
     #total = np.zeros_like(energy_bins)
     for i, energy in enumerate(energy_bins):
         # decay 1 contributions (all identical)
@@ -533,8 +533,8 @@ def compute_dPdtdE(energies_cm:np.ndarray, sterile_mass:float, temp_cm:float, mi
         d4_4s[i] = d4_4
 
         # for decay rate checks
-        d3s[i] = (d3_2 + 2 * d3_4) / 3
-        d4s[i] = (2 * d4_3 + d4_2 + 2 * d4_4) / 5
+        #d3s[i] = (d3_2 + 2 * d3_4) / 3
+        #d4s[i] = (2 * d4_3 + d4_2 + 2 * d4_4) / 5
 
         # electron neutrino contributions
         pe[i] = d1 + d2 + d3_4 + d4_3 + d4_4
@@ -574,7 +574,7 @@ def compute_dPdtdE(energies_cm:np.ndarray, sterile_mass:float, temp_cm:float, mi
     axs[0,0].set_title('Electron Neutrinos')
     axs[0,0].semilogy(energy_bins, pe, label='electron neutrino')
     axs[1,0].set_title('Electron Anti-Neutrinos')
-    axs[1,0].plot(energy_bins, pae, label='anti-electron neutrino')
+    axs[1,0].semilogy(energy_bins, pae, label='anti-electron neutrino')
     axs[0,1].set_title('Muon Neutrinos')
     axs[0,1].semilogy(energy_bins, pm, label='muon neutrino')
     axs[1,1].set_title('Muon Anti-Neutrinos')
@@ -652,6 +652,6 @@ def compute_full_term(energies_cm:np.ndarray, sterile_mass:float, temp_cm:float,
 sterile_mass = 300
 mixing_angle = 1.22e-5
 energies_cm = np.linspace(0, (sterile_mass + 1) / (2 * 0.1) , num_bins)
-print(compute_dPdtdE(energies_cm, sterile_mass, 0.1, mixing_angle))
-#print(compute_dPdtdE(energies_cm, sterile_mass, 10, mixing_angle))
-"""
+e,ae,m,am,t,at=compute_full_term(energies_cm,sterile_mass,1,1.22e-5)
+print(t)"""
+
