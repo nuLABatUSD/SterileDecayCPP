@@ -4,20 +4,20 @@
 #include <iostream>
 #include <fstream>
 #include <chrono>
-
+#include <cmath>
 #include "CashKarp_vals.hh"
 #include "arrays.hh"
 
 using std::cout;
 using std::endl;
 using std::ofstream;
+using std::abs;
 
 using namespace std::chrono;
 
 const double eps = 1e-8; 
-const double TINY = 1e-40;
+const double TINY = 1e-22;
 const double Safety = 0.9;
-
 
 template <class dep>
 class ODESolve
@@ -32,7 +32,7 @@ class ODESolve
         ~ODESolve();
 
         void set_ics(double, dep*, double);
-
+        void shift_x();
         virtual void f(double, dep*, dep*) = 0;
         void RKCash_Karp(double, dep*, double, double*, dep*, dep*);
         bool step_accept(dep*, dep*, dep*, double, double*);
@@ -70,6 +70,12 @@ void ODESolve<dep>::set_ics(double x0, dep* y0, double dx0)
 }
 
 template <class dep>
+void ODESolve<dep>::shift_x()
+{
+    x_value = x_value + 1e-14;
+}
+
+template <class dep>
 void ODESolve<dep>::RKCash_Karp(double x, dep* y, double dx, double* x_stepped, dep* y_5th, dep* y_4th)
 {
     //int N;
@@ -87,7 +93,6 @@ void ODESolve<dep>::RKCash_Karp(double x, dep* y, double dx, double* x_stepped, 
     dep* z4 = new dep(y);
     dep* z5 = new dep(y);
     dep* z6 = new dep(y); //inputs to get k2-k6
-    
     // k1 = dx * f(x, y)
     f(x, y, k1);
     k1 -> multiply_by(dx);  //k1 = dx * f(x,y)
@@ -154,20 +159,18 @@ void ODESolve<dep>::RKCash_Karp(double x, dep* y, double dx, double* x_stepped, 
 
     // x_stepped = x + dx
     *x_stepped = x + dx;
-    
     delete k1;
     delete k2;
     delete k3;
     delete k4;
     delete k5;
     delete k6;
-   
+    
     delete z2;
     delete z3;
     delete z4;
     delete z5;
     delete z6;
-
     return;
 }
 
@@ -186,7 +189,6 @@ bool ODESolve<dep>::step_accept(dep* y, dep* y5, dep* y4, double dx, double* dx_
     { 
         delta1 = abs(y5 -> get_value(i) - y4 -> get_value(i));
         delta0 = eps*(abs(y -> get_value(i)) + abs(y5 -> get_value(i) - y -> get_value(i))) + TINY;
-        
         if (delta1/delta0 > dsm)
         { 
             dsm = delta1/delta0;
@@ -194,17 +196,21 @@ bool ODESolve<dep>::step_accept(dep* y, dep* y5, dep* y4, double dx, double* dx_
             
          }
      }
-      
+    //cout << dsm << ", " << problem << endl;
+    //files.precision(std::numeric_limits<double>::max_digits10);
+    //files << dsm << ", " << problem << endl;
     if (dsm == 0)
     {
         *dx_new = 5 * dx;
         //cout<< "TRUE (dsm == 0) dx_new = " << *dx_new << endl;
+        
         return true;
     } 
     else if (dsm < 1){
         *dx_new = Safety * dx * pow(dsm, -0.2);
         *dx_new = std::min(5.0 * dx, *dx_new); 
         //cout<< "TRUE (dsm < 1) dx_new = " << *dx_new << endl;
+        
         return true;
     }
     else{
@@ -227,7 +233,6 @@ bool ODESolve<dep>::RKCK_step(double x, dep* y, double dx, double* x_next, dep* 
     //dep* y4(y);
     dep* y5 = new dep(y); //???
     dep* y4 = new dep(y);
-
     bool accept = false;
     
     for (int i = 0; i<10; i++)
@@ -274,12 +279,12 @@ bool ODESolve<dep>::ODEOneRun(double x0, dep* y0, double dx0, int N_step, int dN
     // Declare for RKCK_step
     double* x_next = new double; 
     dep* y_next = new dep(y);
-    double* dx_next = new double; 
+    double* dx_next = new double;
 
     bool no_error = true;
     bool done = false;
     
-    ofstream file(file_name);
+    ofstream file(file_name);  
 
     auto start = high_resolution_clock::now();
 
@@ -292,7 +297,6 @@ bool ODESolve<dep>::ODEOneRun(double x0, dep* y0, double dx0, int N_step, int dN
     }
     
     print_csv(file, *x, *dx, y);
-    
     for (int i = 0; i < N_step && no_error && !done; i++) 
     {
         for (int j = 0; j < dN; j++) 
@@ -331,7 +335,7 @@ bool ODESolve<dep>::ODEOneRun(double x0, dep* y0, double dx0, int N_step, int dN
             if (*x == x_final) 
             {
                 cout << "Reached x_final" << endl;
-                print_csv(file, *x, *dx, y);
+                print_csv(file, *x, *dx, y); 
                 //delete x_next;
                 //delete y_next;
                 //delete dx_next;
@@ -341,9 +345,9 @@ bool ODESolve<dep>::ODEOneRun(double x0, dep* y0, double dx0, int N_step, int dN
                 //return true;
             }
         }
-
-        print_csv(file, *x, *dx, y_next);
-
+        if(!done){
+            print_csv(file, *x, *dx, y_next); 
+        }
     }
 
     auto stop = high_resolution_clock::now();
@@ -367,6 +371,7 @@ bool ODESolve<dep>::ODEOneRun(double x0, dep* y0, double dx0, int N_step, int dN
 template <class dep>
 void ODESolve<dep>::print_csv(ostream& os, double x, double dx, dep* y)
 {
+    os.precision(std::numeric_limits<double>::max_digits10 - 1);
     os << x << ", " << dx << ", ";
     y_values->print_csv(os);
     os << endl;

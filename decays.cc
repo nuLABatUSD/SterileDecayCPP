@@ -2,9 +2,11 @@
 #include "constants.hh"
 #include "arrays.hh"
 #include "decays.h"
-
+#include <fstream>
 using std::cout;
 using std::endl;
+using std::ofstream;
+
 
 double get_rate(double ms, double theta, int identifier){
     switch(identifier){
@@ -71,14 +73,69 @@ double get_gamma_b(double evaluate_at){
 
 double get_decay_type_one(double decay_rate, double energy, double width, double ms, double product_mass){
     double neutrino_energy = get_monoenergy(ms, 0, product_mass);
-    if (energy <= neutrino_energy && neutrino_energy <= energy + width){
+    double factor = 0;
+    double sigma = 0.05 * width;
+    double height = 1 / (width - 2 * sigma);
+    double sig2 = 1 / (2 * pow(sigma, 2));
+    if(energy <= neutrino_energy){
+        factor = 0;
+    } else if(energy <= neutrino_energy + sigma){
+        factor = pow(energy - neutrino_energy, 2) * height * sig2;
+    } else if(energy <= neutrino_energy + 2 * sigma){
+        factor = height * (1 - pow(energy - neutrino_energy - 2 * sigma, 2) * sig2);
+    } else if(energy <= neutrino_energy + width - 2 * sigma){
+        factor = height;
+    } else if(energy <= neutrino_energy + width - sigma){
+        factor = height * (1 - pow(energy - width + 2 * sigma - neutrino_energy, 2) * sig2);
+    } else if(energy <= neutrino_energy + width){
+        factor = pow(energy - width - neutrino_energy, 2) * height * sig2;
+    }
+
+    return decay_rate * factor; 
+    
+    /*
+    double neutrino_energy = get_monoenergy(ms, 0, product_mass);
+    if (energy < neutrino_energy && neutrino_energy <= energy + width){
         return decay_rate / width;
     } else {
         return 0;
-    }
+    }*/
 }
 
 double get_decay_type_two(double decay_rate, double energy, double ms, double spectator_mass){
+    double* gamma_pion = new double;
+    double* v_pion = new double;
+    double* p_pion = new double;
+
+    double neutrino_energy_pion = get_monoenergy(_charged_pion_mass_, 0, _muon_mass_);
+    double factor = 0;
+
+    compute_kinetics(ms, _charged_pion_mass_, spectator_mass, gamma_pion, v_pion, p_pion);
+    double width = 2 * *gamma_pion * *v_pion * neutrino_energy_pion;
+    double min = *gamma_pion * neutrino_energy_pion * (1 - *v_pion);
+    double sigma = 0.05 * width;
+    double height = 1 / (width - 2 * sigma);
+    double sig2 = 1 / (2 * pow(sigma, 2));
+    if(energy <= min){
+        factor = 0;
+    } else if(energy <= min + sigma){
+        factor = pow(energy - min, 2) * height * sig2;
+    } else if(energy <= min + 2 * sigma){
+        factor = height * (1 - pow(energy - min - 2 * sigma, 2) * sig2);
+    } else if(energy <= min + width - 2 * sigma){
+        factor = height;
+    } else if(energy <= min + width - sigma){
+        factor = height * (1 - pow(energy - width + 2 * sigma - min, 2) * sig2);
+    } else if(energy <= min + width){
+        factor = pow(energy - width - min, 2) * height * sig2;
+    }
+
+    delete gamma_pion;
+    delete v_pion;
+    delete p_pion;
+
+    return decay_rate * factor;
+    /*
     double* gamma_pion = new double;
     double* v_pion = new double;
     double* p_pion = new double;
@@ -97,6 +154,7 @@ double get_decay_type_two(double decay_rate, double energy, double ms, double sp
     delete p_pion;
 
     return ddecay_rate;
+    */
 }
 
 double get_decay_type_three(double decay_rate, double energy, double ms){
@@ -174,7 +232,7 @@ double get_decay_type_four(double decay_rate, double energy, double ms, double p
     delete four_vals;
     delete x;
 
-    return four;
+    return four; 
 }
 
 void compute_dPdtdE(linspace_and_gl* energies_cm, double ms, double theta, double temp_cm, dummy_vars* pe, dummy_vars* pae, dummy_vars* pm, dummy_vars* pam, dummy_vars* pt, dummy_vars* pat){
@@ -234,6 +292,7 @@ void compute_dPdtdE(linspace_and_gl* energies_cm, double ms, double theta, doubl
         pt->set_value(i, d1 + d2);
         pat->set_value(i, 0);
     }
+    delete energy_bins;
 }
 
 void compute_full_term(linspace_and_gl* energies_cm, double ms, double theta, double temp_cm, dummy_vars* electron, dummy_vars* anti_electron, dummy_vars* muon, dummy_vars* anti_muon, dummy_vars* tau, dummy_vars* anti_tau){
@@ -274,20 +333,3 @@ void compute_full_term(linspace_and_gl* energies_cm, double ms, double theta, do
     delete pt;
     delete pat;
 }
-/*
-int main(){
-    linspace_and_gl* energies_cm = new linspace_and_gl(0,301 / 0.2,100,0);
-    dummy_vars* electron = new dummy_vars(100);
-    dummy_vars* anti_electron = new dummy_vars(100);
-    dummy_vars* muon = new dummy_vars(100);
-    dummy_vars* anti_muon = new dummy_vars(100);
-    dummy_vars* tau = new dummy_vars(100);
-    dummy_vars* anti_tau = new dummy_vars(100);
-
-    compute_full_term(energies_cm, 300, 1.22e-5, 0.1, electron, anti_electron, muon, anti_muon, tau, anti_tau);
-    for(int i = 0; i < 100; i++){
-        cout << anti_tau->get_value(i) << endl;
-    }
-    
-    return 0;
-}*/

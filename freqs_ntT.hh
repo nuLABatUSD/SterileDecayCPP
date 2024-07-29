@@ -14,8 +14,8 @@ class freqs_ntT : public dep_vars
 
     public:
 
-    freqs_ntT(int, double, double, double, double, linspace_and_gl*, dummy_vars*, double, double, double);
-    freqs_ntT(int, double, double);
+    freqs_ntT(int, double, double, double, double, dummy_vars*, double, double, double);
+    freqs_ntT(freqs_ntT*);
     ~freqs_ntT();
 
     double get_eps_value(int);
@@ -23,7 +23,11 @@ class freqs_ntT : public dep_vars
     double get_ms();
     double get_theta();
     int get_num_bins();
+    double get_a_start();
+    double get_a_end();
 
+    void set_a_start(double);
+    void set_a_end(double);
     void set_ms(double);
     void set_theta(double);
 
@@ -49,6 +53,8 @@ class freqs_ntT : public dep_vars
     double get_dQda(double);
 
     double get_dTda(double);
+
+    void compute_derivs(double, dummy_vars*, dummy_vars*, dummy_vars*, dummy_vars*, dummy_vars*, dummy_vars*, double*, double*, double*);
 
     dummy_vars* get_separations();
 };
