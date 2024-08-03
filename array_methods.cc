@@ -92,7 +92,7 @@ void dep_vars::multiply_by(double scalar)
 
 void dep_vars::copy(dep_vars* z)
 {
-    
+
     for (int i = 0; i < N; ++i) 
     {
         values[i] = z -> get_value(i);
@@ -328,6 +328,46 @@ linspace_and_gl::linspace_and_gl(linspace_and_gl* l):dummy_vars(l->N)
 double linspace_and_gl::get_max_linspace(){
     return values[num_lin-1];
     
+}
+
+gel_linspace_gl::gel_linspace_gl(double min_lin, double max_lin, int num):dummy_vars(num)
+{
+    num_gel = 5;
+    num_lin = num - 10;
+    num_gl = 5;
+    double dx_val = (max_lin - min_lin) / (num_lin - 2);
+    double E_low = int(min_lin / dx_val) * dx_val;
+    double E_high = (int(max_lin / dx_val) + 1) * dx_val;
+    double total_length = num_gel + num_lin + num_gl;
+    for(int i = 0; i < total_length; i++){
+        if(i < num_gel){
+            values[i] = (E_low * gel_vals_5[i] + E_low) / 2;
+            weights[i] = gel_weights_5[i] * (E_low / 2);
+        } else if(i < num_gel + num_lin){
+            values[i] = E_low + dx_val * (i - num_gel);
+            if(i == num_gel || i == num_gel + num_lin - 1){
+                weights[i] = dx_val / 2;
+            } else {
+                weights[i] = dx_val;
+            }
+        } else {
+            values[i] = xvals_5[i - num_gel - num_lin] + E_high;
+            weights[i] = wvals_5[i - num_gel - num_lin] * exp(xvals_5[i - num_gel - num_lin]);
+        }
+
+    }
+}
+
+gel_linspace_gl::gel_linspace_gl(gel_linspace_gl* copy_me):dummy_vars(copy_me->N)
+{
+    num_gel = copy_me->num_gel;
+    num_lin = copy_me->num_lin;
+    num_gl = copy_me->num_gl;
+
+    for(int i = 0; i < copy_me->N; i++){
+        values[i] = copy_me->get_value(i);
+        weights[i] = copy_me->get_weight(i);
+    }
 }
 
 //linspace_for_trap

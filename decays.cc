@@ -1,4 +1,5 @@
 #include <cmath>
+#include <algorithm>
 #include "constants.hh"
 #include "arrays.hh"
 #include "decays.h"
@@ -235,7 +236,7 @@ double get_decay_type_four(double decay_rate, double energy, double ms, double p
     return four; 
 }
 
-void compute_dPdtdE(linspace_and_gl* energies_cm, double ms, double theta, double temp_cm, dummy_vars* pe, dummy_vars* pae, dummy_vars* pm, dummy_vars* pam, dummy_vars* pt, dummy_vars* pat){
+void compute_dPdtdE(gel_linspace_gl* energies_cm, double ms, double theta, double temp_cm, dummy_vars* pe, dummy_vars* pae, dummy_vars* pm, dummy_vars* pam, dummy_vars* pt, dummy_vars* pat){
     int num_bins = energies_cm->get_len();
 
     dummy_vars* energy_bins = new dummy_vars(num_bins);
@@ -295,7 +296,7 @@ void compute_dPdtdE(linspace_and_gl* energies_cm, double ms, double theta, doubl
     delete energy_bins;
 }
 
-void compute_full_term(linspace_and_gl* energies_cm, double ms, double theta, double temp_cm, dummy_vars* electron, dummy_vars* anti_electron, dummy_vars* muon, dummy_vars* anti_muon, dummy_vars* tau, dummy_vars* anti_tau){
+void compute_full_term(gel_linspace_gl* energies_cm, double ms, double theta, double temp_cm, dummy_vars* electron, dummy_vars* anti_electron, dummy_vars* muon, dummy_vars* anti_muon, dummy_vars* tau, dummy_vars* anti_tau){
     int num_bins = energies_cm->get_len();
     dummy_vars* pe = new dummy_vars(num_bins);
     dummy_vars* pae = new dummy_vars(num_bins);
@@ -332,4 +333,36 @@ void compute_full_term(linspace_and_gl* energies_cm, double ms, double theta, do
     delete pam;
     delete pt;
     delete pat;
+}
+
+double min_low(double sterile_mass){
+    // initializing pointers for kinematic quantities
+    double* waste = new double;
+    double* gamma_pion_e = new double;
+    double* pion_speed_e = new double;
+
+    // kinetic terms
+    compute_kinetics(sterile_mass, _charged_pion_mass_, _electron_mass_, gamma_pion_e, pion_speed_e, waste);
+
+    // type I accounting
+    double minimum = get_monoenergy(sterile_mass, 0, _neutral_pion_mass_);
+
+    // type II accounting
+    double neutrino_energy_pion = get_monoenergy(_charged_pion_mass_, 0, _muon_mass_);
+    double min_energy_e = *gamma_pion_e * neutrino_energy_pion * (1 - *pion_speed_e);
+
+    if(sterile_mass > _charged_pion_mass_ + _electron_mass_ && min_energy_e < minimum){
+        minimum = min_energy_e;
+    }
+    return minimum;
+}
+
+void seek_as(double start, double end, dummy_vars* scale_factors){
+    int num = scale_factors->get_len();
+    double start_pow = log10(start);
+    double end_pow = log10(end);
+    double pow_step = (end_pow - start_pow) / (num - 1);
+    for(int i = 0; i < num; i++){
+        scale_factors->set_value(i, pow(10, start_pow + i * pow_step));
+    }
 }

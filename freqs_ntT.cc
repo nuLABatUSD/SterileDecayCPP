@@ -8,12 +8,14 @@
 using std::cout;
 using std::endl;
 
-freqs_ntT::freqs_ntT(int num, double start, double end, double ms, double theta, dummy_vars* freqs, double ns, double time, double temp):dep_vars(6*num + 3)
+freqs_ntT::freqs_ntT(int num, double low, double high, double start, double end, double ms, double theta, dummy_vars* freqs, double ns, double time, double temp):dep_vars(6*num + 3)
 {
     num_bins = num;
+    E_low = low;
+    E_high = high;
     a_start = start;
     a_end = end;
-    eps = new linspace_and_gl(0, 10 * (ms + 1) / 2, num, 0);
+    eps = new gel_linspace_gl(E_low * a_start, E_high * a_end, num);
     sterile_mass = ms;
     mixing_angle = theta;
 
@@ -33,11 +35,13 @@ freqs_ntT::freqs_ntT(int num, double start, double end, double ms, double theta,
 
 freqs_ntT::freqs_ntT(freqs_ntT* copy_me):dep_vars(6 * copy_me->get_num_bins() + 3){
     num_bins = copy_me->get_num_bins();
+    E_low = copy_me->get_low();
+    E_high = copy_me->get_high();
     a_start = copy_me->get_a_start();
     a_end = copy_me->get_a_end();
     sterile_mass = copy_me->get_ms();
     mixing_angle = copy_me->get_theta();
-    eps = new linspace_and_gl(0, 10 * (sterile_mass + 1) / 2, num_bins, 0);
+    eps = new gel_linspace_gl(E_low * a_start, E_high * a_end, num_bins);
 
     for(int i = 0; i < 6 * num_bins + 3; i++){
         values[i] = copy_me->get_value(i);
@@ -49,11 +53,71 @@ freqs_ntT::~freqs_ntT()
     delete eps;
 }
 
+void freqs_ntT::eps_shift(double new_a_start, double new_a_end){
+    this->set_a_start(new_a_start);
+    this->set_a_end(new_a_end);
+    gel_linspace_gl* new_eps = new gel_linspace_gl(E_low * new_a_start, E_high * new_a_end, num_bins);
+    // known points are in eps, target point in new_eps
+    double* freqs_ntT = new double[6 * num_bins + 3];
+    for(int i = 0; i < 6 * num_bins; i++){
+        freqs_ntT[i] = values[i];
+    }
+    for(int p = 0; p < 6; p++){
+        for(int k = 0; k < num_bins; k++){
+            if(new_eps->get_value(k) < eps->get_value(num_bins - 1)){
+                double new_val = 0;
+                double new_x_val = new_eps->get_value(k);
+                int key_id = k;
+                while(eps->get_value(key_id) < new_eps->get_value(k)){
+                    key_id++;
+                }
+                int ids[4] = {p * num_bins + key_id - 2, p * num_bins + key_id - 1, p * num_bins + key_id, p * num_bins + key_id + 1};
+                if(key_id + 1 >= num_bins){
+                    ids[3] = p * num_bins + key_id - 3;
+                }
+                if(key_id - 2 < 0){
+                    ids[0] = p * num_bins + key_id + 2;
+                    if(key_id - 1 < 0){
+                        ids[1] = p * num_bins + key_id + 3;
+                    }
+                }
+                for(int i = 0; i < 4; i++){
+                    
+                    double multiplier = 1;
+                    int old_idx = ids[i] % num_bins;
+                    double old_x_val = eps->get_value(old_idx);
+                    double old_val = freqs_ntT[p * num_bins + old_idx];
+                    for(int j = 0; j < 4; j++){
+                        int old_idx2 = ids[j] % num_bins;
+                        double mult_x = eps->get_value(old_idx2);
+                        if(i != j){
+                            multiplier *= (new_x_val - mult_x) / (old_x_val - mult_x);
+                        }
+                    }
+                    new_val += multiplier * log10(old_val);
+                }
+                values[p * num_bins + k] = pow(10, new_val);
+            } else {
+                double old_eps1 = eps->get_value(num_bins - 2);
+                double old_f1 = freqs_ntT[(p + 1) * num_bins - 2];
+                double old_eps2 = eps->get_value(num_bins - 1);
+                double old_f2 = freqs_ntT[(p + 1) * num_bins - 1];
+
+                double logy = ((new_eps->get_value(k) - old_eps1) * (log(old_f2) - log(old_f1)) / (old_eps2 - old_eps1)) + log(old_f1);
+                values[p * num_bins + k] = exp(logy);
+            }
+        }
+    }
+    eps = new gel_linspace_gl(E_low * a_start, E_high * a_end, num_bins);
+    delete new_eps;
+    delete[] freqs_ntT;
+}
+
 double freqs_ntT::get_eps_value(int index){
     return eps->get_value(index);
 }
 
-linspace_and_gl* freqs_ntT::get_eps(){
+gel_linspace_gl* freqs_ntT::get_eps(){
     return eps;
 }
 
@@ -69,12 +133,28 @@ int freqs_ntT::get_num_bins(){
     return num_bins;
 }
 
+double freqs_ntT::get_low(){
+    return E_low;
+}
+
+double freqs_ntT::get_high(){
+    return E_high;
+}
+
 double freqs_ntT::get_a_start(){
     return a_start;
 }
 
 double freqs_ntT::get_a_end(){
     return a_end;
+}
+
+void freqs_ntT::set_low(double new_low){
+    E_low = new_low;
+}
+
+void freqs_ntT::set_high(double new_high){
+    E_high = new_high;
 }
 
 void freqs_ntT::set_a_start(double start){
@@ -131,7 +211,7 @@ double freqs_ntT::get_ind_neutrino_density(int identifier, double a){
     for(int i = 0; i < num_bins; i++){
         integrand->set_value(i, multiplier * pow(eps->get_value(i), 3) * values[i + identifier * num_bins]);
     }
-    eps->set_trap_weights();
+    //eps->set_trap_weights(); Modified the integration
     double integral = eps->integrate(integrand);
 
     delete integrand;
@@ -225,7 +305,7 @@ double freqs_ntT::get_dQda(double a){
     double ns = get_ns();
 
     double total_flow = sterile_mass * ns * pow(a, 3) * dtda / lifetime;
-    eps->set_trap_weights();
+    //eps->set_trap_weights(); Modified the integration
 
     dep_vars* dfda_eps_cube = new dep_vars(num_bins);
     compute_dfda_cube(a, dfda_eps_cube);
@@ -314,7 +394,7 @@ void freqs_ntT::compute_derivs(double a, dummy_vars* electron, dummy_vars* anti_
     }
 
     double total_flow = sterile_mass * ns * pow(a, 3) * *dtda / lifetime;
-    eps->set_trap_weights();
+    //eps->set_trap_weights(); Modified the integration
     double neutrino_loss = eps->integrate(dfda_eps_cube) / (2  * pow(_PI_, 2) * a);
 
     delete dfda_eps_cube;
@@ -381,17 +461,17 @@ dummy_vars* freqs_ntT::get_separations(){
         double energy = eps->get_value(i);
         overfull->set_value(index, energy / nenergy1);
         index += 1;
-        if(sterile_mass >= _neutral_pion_mass_){
+        if(sterile_mass > _neutral_pion_mass_){
             overfull->set_value(index, energy / nenergy2);
             index += 1;
-            if(sterile_mass >= _charged_pion_mass_ + _electron_mass_){
+            if(sterile_mass > _charged_pion_mass_ + _electron_mass_){
                 overfull->set_value(index, energy / min_energy_e);
                 index += 1;
                 overfull->set_value(index, energy / max_energy_e);
                 index += 1;
                 overfull->set_value(index, energy / nenergy42);
                 index += 1;
-                if(sterile_mass >= _charged_pion_mass_ + _muon_mass_){
+                if(sterile_mass > _charged_pion_mass_ + _muon_mass_){
                     overfull->set_value(index, energy / nenergy3);
                     index += 1;
                     overfull->set_value(index, energy / nenergy32);
@@ -451,3 +531,4 @@ dummy_vars* freqs_ntT::get_separations(){
     delete overfull;
     return reduced;
 }
+

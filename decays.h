@@ -13,6 +13,8 @@ double get_decay_type_two(double, double, double, double);
 double get_decay_type_three(double, double, double);
 double type_four_integrand(double, double);
 double get_decay_type_four(double, double, double, double);
-void compute_dPdtdE(linspace_and_gl*, double, double, double, dummy_vars*, dummy_vars*, dummy_vars*, dummy_vars*, dummy_vars*, dummy_vars*);
-void compute_full_term(linspace_and_gl*, double, double, double, dummy_vars*, dummy_vars*, dummy_vars*, dummy_vars*, dummy_vars*, dummy_vars*);
+void compute_dPdtdE(gel_linspace_gl*, double, double, double, dummy_vars*, dummy_vars*, dummy_vars*, dummy_vars*, dummy_vars*, dummy_vars*);
+void compute_full_term(gel_linspace_gl*, double, double, double, dummy_vars*, dummy_vars*, dummy_vars*, dummy_vars*, dummy_vars*, dummy_vars*);
+double min_low(double);
+void seek_as(double, double, dummy_vars*);
 #endif
