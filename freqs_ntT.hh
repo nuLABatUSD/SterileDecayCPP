@@ -60,6 +60,37 @@ class freqs_ntT : public dep_vars
     dummy_vars* get_separations();
 };
 
+class integration
+{
+    protected:
+    gel_linspace_gl* eps;
+    int p1;
+    int count;
+    dep_vars* outer_vals;
+    dep_vars** inner_vals;
+    dummy_vars** p3_vals;
+    double*** Fvv_values;
+    double*** Fvvbar_values;
 
+    public:
+    integration(gel_linspace_gl*, int);
+    integration(integration*);
+    ~integration();
+    dummy_vars** get_p3();
+    double Fvv_comp(freqs_ntT*, bool, int, int, int, double);
+    void populate_Fvv(freqs_ntT*, double);
+    double Fvvbar_comp(freqs_ntT*, bool, int, int, int, double);
+    void populate_Fvvbar(freqs_ntT*, double);
+    double J1(double, double, double);
+    double J2(double, double);
+    double J3(double, double, double);
+    double K1(double, double);
+    double K2(double, double, double);
+    double K3(double, double, double);
+    double interior_integral(freqs_ntT*, int, int);
+    void whole_integral(freqs_ntT*, double, double, double*);
+
+
+};
 
 #endif
