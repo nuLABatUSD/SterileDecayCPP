@@ -72,6 +72,11 @@ class integration
     double*** Fvv_values;
     double*** Fvvbar_values;
 
+    double temp_cm;
+    double me_scaled;
+    dummy_vars* p2_vals;
+
+
     public:
     integration(gel_linspace_gl*, int);
     integration(integration*);
@@ -87,10 +92,40 @@ class integration
     double K1(double, double);
     double K2(double, double, double);
     double K3(double, double, double);
-    double interior_integral(freqs_ntT*, int, int);
+    
+    double interior_integral(int, int);
     void whole_integral(freqs_ntT*, double, double, double*);
+};
 
+class nu_e_collision
+{
+    protected:
+    int p1;
+    int count;
+    int* p4_lows;
+    int* p4_highs;
+    double temp_cm;
+    double me_scaled;
+    gel_linspace_gl* eps;
+    dep_vars* outer_vals;
+    dep_vars** inner_vals;
+    dummy_vars* q2_vals;
+    dummy_vars** q3_vals;
+    double*** F_values;
+    
+    public:
+    nu_e_collision(gel_linspace_gl*, int, double);
+    ~nu_e_collision();
 
+    double get_temp_cm();
+    dummy_vars** get_q3();
+    double M1(double, double);
+    double F_comp(freqs_ntT*, int, int, int);
+    void populate_F(freqs_ntT*, int);
+    void print_F(int);
+    double interior_integral_R1(int, int);
+    void whole_integral_R1(freqs_ntT*, double, double, double*);
+    
 };
 
 #endif

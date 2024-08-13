@@ -4,6 +4,7 @@
 #include "derivatives.hh"
 #include "constants.hh"
 #include "decays.h"
+#include "gl_vals.hh"
 #include <string>
 #include <cmath>
 #include <iostream>
@@ -34,6 +35,11 @@ derivatives::~derivatives(){
 
 dummy_vars* derivatives::retrieve_separations(){
     return y_values->get_separations();
+}
+
+
+freqs_ntT* derivatives::get_yvalues(){
+    return y_values;
 }
 
 void derivatives::update(double new_a_start, double new_a_end){
@@ -155,7 +161,7 @@ int main(){
     */
     double a_start = 0.1;
     double a_end = 0.25;
-    int num = 101;
+    int num = 30;
     int scale_num = 3;
     
     double ms = 300;
@@ -190,6 +196,13 @@ int main(){
     derivatives* sim = new derivatives(num, E_low, E_high, a_low, a_high, ms, theta, freqs, ns, time, temp);
 
     // testing code
+    nu_e_collision* col = new nu_e_collision(eps, 0, 0.1);
+    double p1_energy = eps->get_value(0);
+    double q2_energy = xvals_50[0];
+    dummy_vars** q3 = col->get_q3();
+    col->populate_F(input, 0);
+    cout << p1_energy << ", " << q2_energy << ", " << col->interior_integral_R1(0, 0) << endl;
+
     /*integration* inter = new integration(eps, 17);
     double* results = new double[6];
     double* results2 = new double[6];
@@ -217,10 +230,8 @@ int main(){
     delete inter;
     delete results;
     delete results2;*/
-    
-    sim->set_ics(a_start, input, 0.01 * a_start);
+    /*sim->set_ics(a_start, input, 0.01 * a_start);
     dummy_vars* a_separations = sim->retrieve_separations();
-    
     for(int i = 0; i < a_separations->get_len(); i++){
         double a = a_separations->get_value(i);
         cout << a << endl;
@@ -238,6 +249,8 @@ int main(){
         a_high = scales->get_value(j + 1);
         sim->update(a_low, a_high);
         a_separations = sim->retrieve_separations();
+        freqs_ntT* use = sim->get_yvalues();
+        gel_linspace_gl* use2 = use->get_eps();
         for(int i = 0; i < a_separations->get_len(); i++){
             double a = a_separations->get_value(i);
             cout << a << endl;
@@ -255,7 +268,7 @@ int main(){
     delete input;
     delete sim;
     delete eps;
-    delete freqs;
+    delete freqs;*/
 
     return 0;
 }
