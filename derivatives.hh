@@ -31,7 +31,6 @@ public:
     void set_high(double);
     void set_a_end(double);
     void set_a_start(double);
-    freqs_ntT* get_yvalues();
     void f(double, freqs_ntT*, freqs_ntT*);
 };
 

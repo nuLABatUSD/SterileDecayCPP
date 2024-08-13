@@ -5,7 +5,6 @@
 #include "constants.hh"
 #include "decays.h"
 #include <string>
-#include <cmath>
 #include <iostream>
 #include <fstream>
 
@@ -152,12 +151,7 @@ void derivatives::f(double a, freqs_ntT* inputs, freqs_ntT* derivs){
 }
 
 int main(){
-    /*
-    * These four terms and E_low and E_high are constrained in order for our dummy_vars object to function as intended. In particular, we 
-    * must obey the inequality scales_num >= floor[log( a_end / a_start ) / log(E_low * (num - 11) / E_high) + 2]
-    */
     double a_start = 0.1;
-
     double a_end = 1.00;
     int num = 100;//int(a_end * 50 + 1);
     int scale_num = 5;
@@ -179,7 +173,7 @@ int main(){
     dummy_vars* freqs = new dummy_vars(6 * num);
     for(int i = 0; i < num; i++){
         double E = eps->get_value(i);
-        double f = 1 / (exp(E) + 1);
+        double f = exp(-E) / (exp(-E) + 1);
         freqs->set_value(i, f);
         freqs->set_value(i + num, f);
         freqs->set_value(i + 2 * num, f);
@@ -191,39 +185,8 @@ int main(){
     double ns =  (3 * _zeta_3_ / (2 * pow(_PI_,2))) * _gwd_ * pow(10,3) / _gsdec_;
     freqs_ntT* input = new freqs_ntT(num, E_low, E_high, a_low, a_high, ms, theta, freqs, ns, time, temp);
     derivatives* sim = new derivatives(num, E_low, E_high, a_low, a_high, ms, theta, freqs, ns, time, temp);
-
-    // testing code
-    /*integration* inter = new integration(eps, 17);
-    double* results = new double[6];
-    double* results2 = new double[6];
-    inter->populate_Fvvbar(input, 0);
-    cout << eps->get_value(16) << ", " << eps->get_value(17) << ", " << inter->interior_integral(input, 16, 0) << endl;
-    dummy_vars** p3 = inter->get_p3();
-    for(int i = 0; i < p3[16]->get_len(); i++){
-       cout << i << ", " << eps->get_value(i) << ", " << p3[16]->get_weight(i) << ", " << p3[16]->get_value(i) << endl;
-    }
-    cout << inter->K3(4.28058, 4.02878, 8.30936) <<endl;
-    inter->whole_integral(input, 0.1, 0, results);
-    inter->whole_integral(input, 0.1, 1, results2);
-    for(int i = 0; i < 6; i++){
-        double one = results[i];
-        double two = results2[i];
-        cout << one + two << endl;
-        if(one < 0){
-            one *= -1;
-        } 
-        if(two < 0){
-            two *= -1;
-        }
-        cout << eps->get_value(17) << ", " << one << ", " << two << ", " << one - two << ", " << 200 * (one - two) / (one + two) << "%" << endl;
-    }
-    delete inter;
-    delete results;
-    delete results2;*/
-    
     sim->set_ics(a_start, input, 0.01 * a_start);
     dummy_vars* a_separations = sim->retrieve_separations();
-
 
     string eps_file_name = "Run1/eps0.csv";
     ofstream eps_file;
@@ -242,7 +205,6 @@ int main(){
             sim->shift_x();
         }
     }
-
     for(int j = 1; j < scale_num - 1; j++){
         cout << j << ", " << a_high << ", " << file_idx <<  endl;
         a_low = a_high;
@@ -268,7 +230,6 @@ int main(){
             }
         }
     }
-
 
     cout << "Lifetime: " << get_lifetime(sim->get_sterile_mass(), sim->get_mixing_angle()) * 6.852e-22 << endl;
 
@@ -305,11 +266,13 @@ int main(){
     delete input;
     delete sim;
     delete a_separations;
+    */
     delete scales;
     delete input;
     delete sim;
     delete eps;
     delete freqs;
+    delete a_separations;
 
     return 0;
 }
