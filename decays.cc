@@ -33,6 +33,7 @@ double get_rate(double ms, double theta, int identifier){
             }
         default:
             cout << "Error: this identifier number is not supported" << endl;
+            return 0;
     }
 }
 
