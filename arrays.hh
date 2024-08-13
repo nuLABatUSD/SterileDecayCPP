@@ -65,8 +65,12 @@ class gel_linspace_gl : public dummy_vars
     public:
     gel_linspace_gl(double, double, int);
     gel_linspace_gl(gel_linspace_gl*);
+    int get_gel();
+    int get_lin();
+    int get_gl();
     double get_min_linspace();
     double get_max_linspace();
+    double get_delta();
 };
 
 class linspace_for_trap : public linspace_and_gl

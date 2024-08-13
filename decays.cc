@@ -33,7 +33,6 @@ double get_rate(double ms, double theta, int identifier){
             }
         default:
             cout << "Error: this identifier number is not supported" << endl;
-            return 0;
     }
 }
 
@@ -94,14 +93,6 @@ double get_decay_type_one(double decay_rate, double energy, double width, double
     }
 
     return decay_rate * factor; 
-    
-    /*
-    double neutrino_energy = get_monoenergy(ms, 0, product_mass);
-    if (energy < neutrino_energy && neutrino_energy <= energy + width){
-        return decay_rate / width;
-    } else {
-        return 0;
-    }*/
 }
 
 double get_decay_type_two(double decay_rate, double energy, double ms, double spectator_mass){
@@ -137,26 +128,6 @@ double get_decay_type_two(double decay_rate, double energy, double ms, double sp
     delete p_pion;
 
     return decay_rate * factor;
-    /*
-    double* gamma_pion = new double;
-    double* v_pion = new double;
-    double* p_pion = new double;
-
-    double neutrino_energy_pion = get_monoenergy(_charged_pion_mass_, 0, _muon_mass_);
-    double ddecay_rate = 0;
-
-    compute_kinetics(ms, _charged_pion_mass_, spectator_mass, gamma_pion, v_pion, p_pion);
-
-    if (*(gamma_pion) * neutrino_energy_pion * (1 - *(v_pion)) <= energy && energy <= *(gamma_pion) * neutrino_energy_pion * (1 + *(v_pion))){
-        ddecay_rate = decay_rate / (2 * *(gamma_pion) * *(v_pion) * neutrino_energy_pion);
-    }
-    
-    delete gamma_pion;
-    delete v_pion;
-    delete p_pion;
-
-    return ddecay_rate;
-    */
 }
 
 double get_decay_type_three(double decay_rate, double energy, double ms){

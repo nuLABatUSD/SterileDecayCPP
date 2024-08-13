@@ -5,6 +5,6 @@ __pycache__
 *.pdf
 *.npz
 *.mp4
+*.csv
 Untitled*
 *.exe
-*.csv
