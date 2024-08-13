@@ -52,7 +52,7 @@ void dep_vars::zeros()
     for (int i = 0; i < N; i++)
         values[i] = 0.0;
 }
-   
+    
 void dep_vars::print_all()
 {
     for (int i = 0; i < N; i++)
@@ -368,30 +368,6 @@ gel_linspace_gl::gel_linspace_gl(gel_linspace_gl* copy_me):dummy_vars(copy_me->N
         values[i] = copy_me->get_value(i);
         weights[i] = copy_me->get_weight(i);
     }
-}
-
-int gel_linspace_gl::get_gel(){
-    return num_gel;
-}
-
-int gel_linspace_gl::get_lin(){
-    return num_lin;
-}
-
-int gel_linspace_gl::get_gl(){
-    return num_gl;
-}
-
-double gel_linspace_gl::get_min_linspace(){
-    return values[num_gel];
-}
-
-double gel_linspace_gl::get_max_linspace(){
-    return values[num_gel + num_lin - 1];
-}
-
-double gel_linspace_gl::get_delta(){
-    return values[num_gel + 1] - values[num_gel];
 }
 
 //linspace_for_trap
