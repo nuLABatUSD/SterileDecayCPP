@@ -29,7 +29,7 @@ derivatives::derivatives(int num, double low, double high, double start, double 
 }
 
 derivatives::~derivatives(){
-    delete y_values;
+    ;//delete y_values;
 }
 
 dummy_vars* derivatives::retrieve_separations(){
@@ -83,6 +83,9 @@ void derivatives::set_a_end(double end){
 double derivatives::get_a_start(){
     return a_start;
 }
+
+double derivatives::get_eps_value(int i)
+{   return y_values->get_eps_value(i); }
 
 void derivatives::set_a_start(double start){
     a_start = start;
@@ -154,10 +157,10 @@ int main(){
     * must obey the inequality scales_num >= floor[log( a_end / a_start ) / log(E_low * (num - 11) / E_high) + 2]
     */
     double a_start = 0.1;
-    double a_end = 0.25;
-    int num = 101;
-    int scale_num = 3;
-    
+
+    double a_end = 1.00;
+    int num = 100;//int(a_end * 50 + 1);
+    int scale_num = 5;
     double ms = 300;
     double theta = 1.22e-5;
     double time = 0;
@@ -220,13 +223,21 @@ int main(){
     
     sim->set_ics(a_start, input, 0.01 * a_start);
     dummy_vars* a_separations = sim->retrieve_separations();
-    
+
+
+    string eps_file_name = "Run1/eps0.csv";
+    ofstream eps_file;
+    eps_file.open(eps_file_name);
+    for(int i = 0; i < input->get_num_bins()-1; i++)
+        eps_file << sim->get_eps_value(i) << ", ";
+    eps_file << sim->get_eps_value(input->get_num_bins()-1) << endl;
+    eps_file.close();
     for(int i = 0; i < a_separations->get_len(); i++){
         double a = a_separations->get_value(i);
         cout << a << endl;
-        string name = "ou" + to_string(file_idx) + ".csv";
+        string name = "Run1/ou0-" + to_string(file_idx) + ".csv";
         file_idx++; 
-        sim->run(100, 2, a, name);
+        sim->run(100, 100, a, name);
         if(i != a_separations->get_len() - 1){
             sim->shift_x();
         }
@@ -238,18 +249,61 @@ int main(){
         a_high = scales->get_value(j + 1);
         sim->update(a_low, a_high);
         a_separations = sim->retrieve_separations();
+
+        string eps_file_name = "Run1/eps" + to_string(j) + ".csv";
+        eps_file.open(eps_file_name);
+        for(int i = 0; i < input->get_num_bins()-1; i++)
+            eps_file << sim->get_eps_value(i) << ", ";
+        eps_file << sim->get_eps_value(input->get_num_bins()-1) << endl;
+        eps_file.close();
+        
         for(int i = 0; i < a_separations->get_len(); i++){
             double a = a_separations->get_value(i);
             cout << a << endl;
-            string name = "ou" + to_string(file_idx) + ".csv"; 
+            string name = "Run1/ou" + to_string(j) + "-" + to_string(i) + ".csv"; 
             file_idx++;
-            sim->run(100, 2, a, name);
+            sim->run(100, 100, a, name);
             if(i != a_separations->get_len() - 1){
                 sim->shift_x();
             }
         }
     }
 
+
+    cout << "Lifetime: " << get_lifetime(sim->get_sterile_mass(), sim->get_mixing_angle()) * 6.852e-22 << endl;
+
+    /*
+    gel_linspace_gl* eps = new gel_linspace_gl(E_low * a_start, E_high * a_end, num);
+    dummy_vars* freqs = new dummy_vars(6 * num);
+    for(int i = 0; i < num; i++){
+        double E = eps->get_value(i);
+        double f = exp(-E) / (exp(-E) + 1);
+        freqs->set_value(i, f);
+        freqs->set_value(i + num, f);
+        freqs->set_value(i + 2 * num, f);
+        freqs->set_value(i + 3 * num, f);
+        freqs->set_value(i + 4 * num, f);
+        freqs->set_value(i + 5 * num, f);
+    }
+    
+    double ns =  (3 * _zeta_3_ / (2 * pow(_PI_,2))) * _gwd_ * pow(10,3) / _gsdec_;
+    freqs_ntT* input = new freqs_ntT(num, E_low, E_high, a_start, a_end, ms, theta, freqs, ns, time, temp);
+    freqs_ntT* output = new freqs_ntT(num, E_low, E_high, a_start, a_end, ms, theta, freqs, ns, time, temp);
+    derivatives* sim = new derivatives(num, E_low, E_high, a_start, a_end, ms, theta, freqs, ns, time, temp);
+    sim->set_ics(a_start, input, 0.01 * a_start);
+    dummy_vars* a_separations = input->get_separations();
+    cout << "Length:" << a_separations->get_len() << endl;
+    for(int i = 0; i < a_separations->get_len(); i++){
+        double a = a_separations->get_value(i);
+        cout << a << endl;
+        string name = "ou" + to_string(i) + ".csv"; 
+        sim->run(100, 2, a, name);
+        sim->shift_x();
+    }
+    delete eps;
+    delete freqs;
+    delete input;
+    delete sim;
     delete a_separations;
     delete scales;
     delete input;

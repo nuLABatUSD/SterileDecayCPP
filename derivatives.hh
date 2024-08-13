@@ -24,6 +24,7 @@ public:
     double get_high();
     double get_a_end();
     double get_a_start();
+    double get_eps_value(int);
     void set_sterile_mass(double);
     void set_mixing_angle(double);
     void set_low(double);
