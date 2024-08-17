@@ -40,7 +40,7 @@ for i in range(1446):
 sm_scale=[]
 sm_temp=[]
 sm_time =[]
-for i in range(78):
+for i in range(104):
     with open(f'SterileDecayCPP2/ou{i}.csv', 'r') as mod:
         reader = csv.reader(mod)
         for line in reader:
