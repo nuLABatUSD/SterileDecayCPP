@@ -4,6 +4,9 @@
 #include "freqs_ntT.hh"
 #include "thermodynamics.h"
 #include "decays.h"
+#include "gl_vals.hh"
+#include "gel_vals.hh"
+#include <iomanip>
 
 using std::cout;
 using std::endl;
@@ -56,7 +59,7 @@ freqs_ntT::~freqs_ntT()
 void freqs_ntT::eps_shift(double new_a_start, double new_a_end){
     this->set_a_start(new_a_start);
     this->set_a_end(new_a_end);
-    gel_linspace_gl* new_eps = new gel_linspace_gl(E_low * 0.1, E_high * new_a_end, num_bins);
+    gel_linspace_gl* new_eps = new gel_linspace_gl(E_low * new_a_start, E_high * new_a_end, num_bins);
     // known points are in eps, target point in new_eps
     double* freqs_ntT = new double[6 * num_bins + 3];
     for(int i = 0; i < 6 * num_bins; i++){
@@ -108,7 +111,7 @@ void freqs_ntT::eps_shift(double new_a_start, double new_a_end){
             }
         }
     }
-    eps = new gel_linspace_gl(E_low * 0.1, E_high * a_end, num_bins);
+    eps = new gel_linspace_gl(E_low * new_a_start, E_high * a_end, num_bins);
     delete new_eps;
     delete[] freqs_ntT;
 }
@@ -645,7 +648,7 @@ double integration::Fvv_comp(freqs_ntT* input, bool neutrino, int which_term, in
         f4 = 0;
         double s_mod = 1.;
         if(k_mod != which_term){
-            s_mod = 1./4;
+            s_mod = 1./2;
         }
         // f2 and f3 (if p3 not end-point) known exactly
         f2 = input->get_value(k_mod * num + p2);
@@ -958,7 +961,7 @@ double integration::K3(double p1, double p2, double p3){
     return 16./15 * (pow(p1-p3,5) + 10 * pow(p1-p3,2) * pow(p2,3) + 15 * (p1-p3) * pow(p2,4) + 6 * pow(p2,5));
 }
 
-double integration::interior_integral(freqs_ntT* input, int p2, int which_term){
+double integration::interior_integral(int p2, int which_term){
     // split finite and infinite terms
     double p_1_energy = eps->get_value(p1);
     double p2_energy = eps->get_value(p2);
@@ -1000,7 +1003,8 @@ double integration::interior_integral(freqs_ntT* input, int p2, int which_term){
 }
 
 void integration::whole_integral(freqs_ntT* input, double a, double check, double* results){
-    if (p1==0){
+    double p_1_energy = eps->get_value(p1);
+    if (p_1_energy == 0){
         for(int i=0; i<6; i++){
             results[i] = 0;
         }
@@ -1010,14 +1014,1149 @@ void integration::whole_integral(freqs_ntT* input, double a, double check, doubl
         this->populate_Fvv(input, check);
         this->populate_Fvvbar(input, check);
         double Tcm = 1 / a;
-            
-        double p_1_energy = eps->get_value(p1);
+        
         for(int i=0; i<6; i++){
             for(int p2=0; p2<eps->get_len(); p2++){
-                outer_vals->set_value(p2, interior_integral(input, p2, i));
+                outer_vals->set_value(p2, interior_integral(p2, i));
             }
             results[i] = eps->integrate(outer_vals);
             results[i] *= pow(Tcm, 5) * pow(_GF_,2) / (pow(2*_PI_,3) * pow(p_1_energy,2));
+        }
+    }
+}
+
+// nu_e_collision_R1 to take care of neutrino-electron R1 collision integrals
+
+nu_e_collision_R1::nu_e_collision_R1(gel_linspace_gl* e, int p1_idx, double a){
+    eps = new gel_linspace_gl(e);
+    p1 = p1_idx;
+    temp_cm = 1 / a;
+    me_scaled = _electron_mass_ / temp_cm;
+    count = 0;
+
+    q2_vals = new dummy_vars(50);
+    int size = q2_vals->get_len();
+
+    for(int i = 0; i < size; i++){
+        q2_vals->set_value(i, xvals_50[i]);
+        q2_vals->set_weight(i, wvals_50[i] * exp(xvals_50[i]));
+    }
+
+    outer_vals = new dep_vars(size);
+    inner_vals = new dep_vars*[size];
+    q3_vals = new dummy_vars*[size];
+    p4_lows = new int[size];
+    p4_highs = new int[size];
+
+    double p1_energy = eps->get_value(p1);
+    for(int q2 = 0; q2 < size; q2++){
+        double q2_energy = q2_vals->get_value(q2);
+        double E2 = sqrt(pow(q2_energy, 2) + pow(me_scaled, 2));
+        double E3_min = me_scaled;
+
+        if(p1 < me_scaled / 2 && q2_energy > p1_energy){
+            E3_min = p1 + E2 - 0.5 * (2 * p1_energy + E2 - q2_energy + pow(me_scaled, 2) / (2 * p1_energy + E2 - q2_energy));
+        }
+
+        double E3_max = 0.5 * (2 * p1_energy + E2 + q2_energy + pow(me_scaled, 2) / (2 * p1_energy + E2 + q2_energy)); //E_lim1
+        double p4_min = p1_energy + E2 - E3_max;
+        double p4_max = p1_energy + E2 - E3_min;
+
+        int p4_low = 0;
+        int p4_high = 0;
+        while(eps->get_value(p4_low) <= p4_min){
+            p4_low++;
+            p4_high++;
+            if(p4_low >= eps->get_len()){
+                break;
+            }
+        }
+        if(p4_high != eps->get_len()){
+            while(eps->get_value(p4_high) < p4_max){
+                p4_high++;
+                if(p4_high >= eps->get_len()){
+                    break;
+                }
+            }
+        }
+        p4_high--;
+        
+        p4_lows[q2] = p4_low;
+        p4_highs[q2] = p4_high;
+
+        q3_vals[q2] = new dummy_vars(p4_high - p4_low + 3);
+        inner_vals[q2] = new dep_vars(p4_high - p4_low + 3);
+        if(E3_min <= me_scaled){
+            q3_vals[q2]->set_value(0, 0);
+        } else {
+            q3_vals[q2]->set_value(0, sqrt(pow(E3_min, 2) - pow(me_scaled, 2)));
+        }
+        q3_vals[q2]->set_value(p4_high - p4_low + 2, sqrt(pow(E3_max,2) - pow(me_scaled, 2)));
+
+        count = p4_low;
+        for(int i = 1; i <= p4_high - p4_low + 1; i++){
+            double p4_energy = eps->get_value(p4_low + i - 1);
+            q3_vals[q2]->set_value(p4_high - p4_low - i + 2, sqrt(pow(p1_energy + E2 - p4_energy, 2) - pow(me_scaled, 2)));
+        }
+
+        q3_vals[q2]->set_trap_weights();
+    }
+
+    F_values = new double**[6]; 
+    for(int i=0; i<6; i++){
+        F_values[i] = new double*[size];
+        for(int j = 0; j < size; j++){
+            F_values[i][j] = new double[eps->get_len() + 1](); 
+        }
+    }    
+}
+
+double nu_e_collision_R1::get_temp_cm(){
+    return temp_cm;
+}
+
+dummy_vars** nu_e_collision_R1::get_q3(){
+    return q3_vals;
+}
+
+double nu_e_collision_R1::M1_R1(double q2, double y, int which_term){
+    double p1_energy = eps->get_value(p1);
+    double E2 = sqrt(pow(q2, 2) + pow(me_scaled, 2));
+
+    double mult1;
+    double mult2;
+    if(which_term < 2){
+        mult1 = pow(2, 3) * pow(_GF_ * (2 * _Weinberg_ + 1), 2);
+        mult2 = 2 * _Weinberg_ / (2 * _Weinberg_ + 1);
+    } else {
+        mult1 = pow(2, 3) * pow(_GF_ * (2 * _Weinberg_ - 1), 2);
+        mult2 = 2 * _Weinberg_ / (2 * _Weinberg_ - 1);
+    }
+    double mult3 = (1 + mult2) * pow(me_scaled, 2) - pow(E2, 2) - 2 * E2 * p1_energy - pow(p1_energy, 2);
+    double mult4 = pow(me_scaled, 2) - pow(E2, 2) - 2 * E2 * p1_energy - pow(p1_energy, 2);
+    double mult5 = (1 + 2 * mult2) * pow(me_scaled, 2) - pow(E2, 2) - 2 * E2 * p1_energy - pow(p1_energy, 2);
+
+    double term1 = pow(y, 5) / 5;
+    double term2 = (2. / 3) * pow(y, 3) * mult3;
+    double term3 = y * mult4 * mult5;
+
+    return mult1 * (term1 + term2 + term3);
+}
+
+double nu_e_collision_R1::M2_R1(double q2, double y, int which_term){
+    double p1_energy = eps->get_value(p1);
+    double E2 = sqrt(pow(q2, 2) + pow(me_scaled, 2));
+
+    double mult1 = pow(2, 5) * pow(_GF_ * _Weinberg_, 2);
+    double mult2;
+    if(which_term < 2){
+        mult2 = -(2 * _Weinberg_ + 1) / 2 * _Weinberg_ ;
+    } else {
+        mult2 = -(2 * _Weinberg_ - 1) / 2 * _Weinberg_ ;
+    }
+    double mult3 = (1 + mult2) * pow(me_scaled, 2) - pow(E2, 2) - 2 * E2 * p1_energy - pow(p1_energy, 2);
+    double mult4 = pow(me_scaled, 2) - pow(E2, 2) - 2 * E2 * p1_energy - pow(p1_energy, 2);
+    double mult5 = (1 + 2 * mult2) * pow(me_scaled, 2) - pow(E2, 2) - 2 * E2 * p1_energy - pow(p1_energy, 2);
+
+    double term1 = pow(y, 5) / 5;
+    double term2 = (2. / 3) * pow(y, 3) * mult3;
+    double term3 = y * mult4 * mult5;
+
+    return mult1 * (term1 + term2 + term3); 
+}
+
+double nu_e_collision_R1::F_comp(freqs_ntT* input, int which_term, int q2, int q3, int check){
+    double p1_energy = eps->get_value(p1);
+    double q2_energy = q2_vals->get_value(q2);
+    double E2 = sqrt(pow(q2_energy, 2) + pow(me_scaled, 2));
+    double q3_energy = q3_vals[q2]->get_value(q3);
+    double E3 = sqrt(pow(q3_energy, 2) + pow(me_scaled, 2));
+    double p4_energy = p1_energy + E2 - E3;
+
+    int num = eps->get_len();
+    double f1 = input->get_value(which_term * num + p1);
+    double f2 = 1 / (exp(E2 * temp_cm / input->get_temp()) + 1);
+    double f3 = 1 / (exp(E3 * temp_cm / input->get_temp()) + 1);
+    double f4 = 0;
+    if(q3 != 0 && q3 != q3_vals[q2]->get_len() - 1){
+        f4 = input->get_value(which_term * num + p4_highs[q2] - q3 + 1);
+    } else {
+        // interpolation / extrapolation for p4
+        if(eps->get_value(num - 1) >= p4_energy){
+            int p4 = 0;
+            for(int j = 0; j < num; j++){
+                if(eps->get_value(j) < p4_energy){
+                    p4++;
+                }
+            }
+
+            int ids[4] = {which_term * num + p4 - 2, which_term * num + p4 - 1, which_term * num + p4, which_term * num + p4 + 1};
+            
+            if(p4 + 1 >= num){
+                ids[3] = which_term * num + p4 - 3;
+            }
+            if(p4 - 2 < 0){
+                ids[0] = which_term * num + p4 + 2;
+                if(p4 - 1 < 0){
+                    ids[1] = which_term * num + p4 + 3;
+                }
+            }
+            
+            
+            for(int i = 0; i < 4; i++){
+                double multiplier = 1;
+                int old_idx = ids[i] % num;
+                double old_x_val = eps->get_value(old_idx);
+                double old_val = input->get_value(ids[i]);
+                for(int j = 0; j < 4; j++){
+                    int old_idx2 = ids[j] % num;
+                    double mult_x = eps->get_value(old_idx2);
+                    if(i != j){
+                        multiplier *= (p4_energy - mult_x) / (old_x_val - mult_x);
+                    }
+                }
+                f4 += multiplier * log10(old_val);
+            }
+            f4 = pow(10, f4); 
+        } else {
+            double old_eps1 = eps->get_value(num - 2);
+            double old_f1 = input->get_value((which_term + 1) * num - 2);
+            double old_eps2 = eps->get_value(num - 1);
+            double old_f2 = input->get_value((which_term + 1) * num - 1);
+
+            double logy = ((p4_energy - old_eps1) * (log(old_f2) - log(old_f1)) / (old_eps2 - old_eps1)) + log(old_f1);
+            f4 = exp(logy);
+        }
+    }
+    return ((check + 1) * f3 * f4 * (1 - f1) * (1 - f2) - check * f1 * f2 * (1 - f3) * (1 - f4));
+}
+
+void nu_e_collision_R1::populate_F(freqs_ntT* input, int check){
+    int num = eps->get_len();
+    int size = q2_vals->get_len();
+    for(int i = 0; i < size; i++){
+        int num3 = q3_vals[i]->get_len();
+        for(int j = 0; j < num + 1; j++){
+            for(int k = 0; k < 6; k++){
+                if(j < num3){
+                    F_values[k][i][j] = F_comp(input, k, i, j, check);
+                } else {
+                    F_values[k][i][j] = 0;
+                }
+            }
+        }
+    }
+}
+
+void nu_e_collision_R1::print_F(int i){
+    for(int j = 0; j < q3_vals[i]->get_len(); j++){
+        cout <<j<<", "<< q3_vals[i]->get_value(j) << ", " << F_values[0][i][j] << endl;
+    }
+}
+
+double nu_e_collision_R1::interior_integral_R1(int q2, int which_term){
+    double p1_energy = eps->get_value(p1);
+    double q2_energy = q2_vals->get_value(q2);
+    double E2 = sqrt(pow(q2_energy, 2) + pow(me_scaled, 2));
+    
+    double p_cut1 = sqrt(pow(me_scaled + 2 * pow(p1_energy, 2) / (me_scaled - 2 * p1_energy), 2) - pow(me_scaled, 2));
+    double p_cut3 = p1_energy;
+    double p_trans2 = sqrt(pow(0.5 * (2 * p1_energy + E2 - q2_energy + pow(me_scaled, 2) / (2 * p1_energy + E2 - q2_energy)), 2) - pow(me_scaled, 2));
+    double p_lim1 = sqrt(pow(0.5 * (2 * p1_energy + E2 + q2_energy + pow(me_scaled, 2) / (2 * p1_energy + E2 + q2_energy)), 2) - pow(me_scaled, 2));
+    double p_lim2 = p_trans2;
+
+    double M1_2 = M1_R1(q2_energy, p1_energy + q2_energy, which_term) - M1_R1(q2_energy, p1_energy - q2_energy, which_term);
+    double M2_2 = M1_R1(q2_energy, p1_energy + q2_energy, which_term) - M1_R1(q2_energy, p1_energy - q2_energy, which_term);
+
+    double q3_energy;
+    double E3;
+    double yi;
+    double yf;
+
+    if(p1_energy < me_scaled / 2){
+        if(q2_energy < p_cut3){
+            int q3 = 0;
+            while(q3_vals[q2]->get_value(q3) < q2_energy){
+                q3_energy = q3_vals[q2]->get_value(q3);
+                E3 = sqrt(pow(q3_energy, 2) + pow(me_scaled, 2));
+                yi = p1_energy + E2 + - E3 - q3_energy;
+                yf = p1_energy + E2 - E3 + q3_energy;
+                inner_vals[q2]->set_value(q3, (q3_energy / E3) * F_values[which_term][q2][q3] * (M1_R1(q2_energy, yf, which_term) - M1_R1(q2_energy, yi, which_term) + M2_R1(q2_energy, yf, which_term) - M2_R1(q2_energy, yi, which_term)));
+                q3++;
+            }
+            while(q3_vals[q2]->get_value(q3) < p_trans2){
+                q3_energy = q3_vals[q2]->get_value(q3);
+                E3 = sqrt(pow(q3_energy, 2) + pow(me_scaled, 2));
+                inner_vals[q2]->set_value(q3, (q3_energy / E3) * F_values[which_term][q2][q3] * M1_2);
+                q3++;
+            }
+            while(q3 < inner_vals[q2]->length()){
+                q3_energy = q3_vals[q2]->get_value(q3);
+                E3 = sqrt(pow(q3_energy, 2) + pow(me_scaled, 2));
+                yi = E3 + q3_energy - p1_energy - E2;
+                yf = p1_energy + q2_energy;
+                inner_vals[q2]->set_value(q3, (q3_energy / E3) * F_values[which_term][q2][q3] * (M1_R1(q2_energy, yf, which_term) - M1_R1(q2_energy, yi, which_term) + M2_R1(q2_energy, yf, which_term) - M2_R1(q2_energy, yi, which_term)));
+                q3++;
+            }
+        } else if(q2_energy < p_cut1){
+            int q3 = 0;
+            while(q3_vals[q2]->get_value(q3) < p_trans2){
+                q3_energy = q3_vals[q2]->get_value(q3);
+                E3 = sqrt(pow(q3_energy, 2) + pow(me_scaled, 2));
+                yi = p1_energy + E2 + - E3 - q3_energy;
+                yf = p1_energy + E2 - E3 + q3_energy;
+                inner_vals[q2]->set_value(q3, (q3_energy / E3) * F_values[which_term][q2][q3] * (M1_R1(q2_energy, yf, which_term) - M1_R1(q2_energy, yi, which_term) + M2_R1(q2_energy, yf, which_term) - M2_R1(q2_energy, yi, which_term)));
+                q3++;
+            }
+            while(q3_vals[q2]->get_value(q3) < q2_energy){
+                q3_energy = q3_vals[q2]->get_value(q3);
+                E3 = sqrt(pow(q3_energy, 2) + pow(me_scaled, 2));
+                yi = q2_energy - p1_energy;
+                yf = p1_energy + E2 - E3 + q3_energy;
+                inner_vals[q2]->set_value(q3, (q3_energy / E3) * F_values[which_term][q2][q3] * (M1_R1(q2_energy, yf, which_term) - M1_R1(q2_energy, yi, which_term) + M2_R1(q2_energy, yf, which_term) - M2_R1(q2_energy, yi, which_term)));
+                q3++;
+            }
+            while(q3 < inner_vals[q2]->length()){
+                q3_energy = q3_vals[q2]->get_value(q3);
+                E3 = sqrt(pow(q3_energy, 2) + pow(me_scaled, 2));
+                yi = E3 + q3_energy - p1_energy - E2;
+                yf = p1_energy + q2_energy;
+                inner_vals[q2]->set_value(q3, (q3_energy / E3) * F_values[which_term][q2][q3] * (M1_R1(q2_energy, yf, which_term) - M1_R1(q2_energy, yi, which_term) + M2_R1(q2_energy, yf, which_term) - M2_R1(q2_energy, yi, which_term)));
+                q3++;
+            }
+        } else {
+            int q3 = 0;
+            while(q3_vals[q2]->get_value(q3) < q2_energy){
+                q3_energy = q3_vals[q2]->get_value(q3);
+                E3 = sqrt(pow(q3_energy, 2) + pow(me_scaled, 2));
+                yi = q2_energy - p1_energy;
+                yf = p1_energy + E2 - E3 + q3_energy;
+                inner_vals[q2]->set_value(q3, (q3_energy / E3) * F_values[which_term][q2][q3] * (M1_R1(q2_energy, yf, which_term) - M1_R1(q2_energy, yi, which_term) + M2_R1(q2_energy, yf, which_term) - M2_R1(q2_energy, yi, which_term)));
+                q3++;
+            }
+            while(q3 < inner_vals[q2]->length()){
+                q3_energy = q3_vals[q2]->get_value(q3);
+                E3 = sqrt(pow(q3_energy, 2) + pow(me_scaled, 2));
+                yi = E3 + q3_energy - p1_energy - E2;
+                yf = p1_energy + q2_energy;
+                inner_vals[q2]->set_value(q3, (q3_energy / E3) * F_values[which_term][q2][q3] * (M1_R1(q2_energy, yf, which_term) - M1_R1(q2_energy, yi, which_term) + M2_R1(q2_energy, yf, which_term) - M2_R1(q2_energy, yi, which_term)));
+                q3++;
+            }
+        }
+    } else {
+        if(q2_energy < p_cut3){
+            int q3 = 0;
+            while(q3_vals[q2]->get_value(q3) < q2_energy){
+                q3_energy = q3_vals[q2]->get_value(q3);
+                E3 = sqrt(pow(q3_energy, 2) + pow(me_scaled, 2));
+                yi = p1_energy + E2 + - E3 - q3_energy;
+                yf = p1_energy + E2 - E3 + q3_energy;
+                inner_vals[q2]->set_value(q3, (q3_energy / E3) * F_values[which_term][q2][q3] * (M1_R1(q2_energy, yf, which_term) - M1_R1(q2_energy, yi, which_term) + M2_R1(q2_energy, yf, which_term) - M2_R1(q2_energy, yi, which_term)));
+                q3++;
+            }
+            while(q3_vals[q2]->get_value(q3) < p_trans2){
+                q3_energy = q3_vals[q2]->get_value(q3);
+                E3 = sqrt(pow(q3_energy, 2) + pow(me_scaled, 2));
+                inner_vals[q2]->set_value(q3, (q3_energy / E3) * F_values[which_term][q2][q3] * M1_2);
+                q3++;
+            }
+            while(q3 < inner_vals[q2]->length()){
+                q3_energy = q3_vals[q2]->get_value(q3);
+                E3 = sqrt(pow(q3_energy, 2) + pow(me_scaled, 2));
+                yi = E3 + q3_energy - p1_energy - E2;
+                yf = p1_energy + q2_energy;
+                inner_vals[q2]->set_value(q3, (q3_energy / E3) * F_values[which_term][q2][q3] * (M1_R1(q2_energy, yf, which_term) - M1_R1(q2_energy, yi, which_term) + M2_R1(q2_energy, yf, which_term) - M2_R1(q2_energy, yi, which_term)));
+                q3++;
+            }
+        } else {
+            int q3 = 0;
+            while(q3_vals[q2]->get_value(q3) < p_trans2){
+                q3_energy = q3_vals[q2]->get_value(q3);
+                E3 = sqrt(pow(q3_energy, 2) + pow(me_scaled, 2));
+                yi = p1_energy + E2 + - E3 - q3_energy;
+                yf = p1_energy + E2 - E3 + q3_energy;
+                inner_vals[q2]->set_value(q3, (q3_energy / E3) * F_values[which_term][q2][q3] * (M1_R1(q2_energy, yf, which_term) - M1_R1(q2_energy, yi, which_term) + M2_R1(q2_energy, yf, which_term) - M2_R1(q2_energy, yi, which_term)));
+                q3++;
+            }
+            while(q3_vals[q2]->get_value(q3) < q2_energy){
+                q3_energy = q3_vals[q2]->get_value(q3);
+                E3 = sqrt(pow(q3_energy, 2) + pow(me_scaled, 2));
+                yi = q2_energy - p1_energy;
+                yf = p1_energy + E2 - E3 + q3_energy;
+                inner_vals[q2]->set_value(q3, (q3_energy / E3) * F_values[which_term][q2][q3] * (M1_R1(q2_energy, yf, which_term) - M1_R1(q2_energy, yi, which_term) + M2_R1(q2_energy, yf, which_term) - M2_R1(q2_energy, yi, which_term)));
+                q3++;
+            }
+            while(q3 < inner_vals[q2]->length()){
+                q3_energy = q3_vals[q2]->get_value(q3);
+                E3 = sqrt(pow(q3_energy, 2) + pow(me_scaled, 2));
+                yi = E3 + q3_energy - p1_energy - E2;
+                yf = p1_energy + q2_energy;
+                inner_vals[q2]->set_value(q3, (q3_energy / E3) * F_values[which_term][q2][q3] * (M1_R1(q2_energy, yf, which_term) - M1_R1(q2_energy, yi, which_term) + M2_R1(q2_energy, yf, which_term) - M2_R1(q2_energy, yi, which_term)));
+                q3++;
+            }
+        }
+    }
+    return q3_vals[q2]->integrate(inner_vals[q2]);
+}
+
+void nu_e_collision_R1::whole_integral(freqs_ntT* input, double check, double* results){
+    //populates F_values
+    this->populate_F(input, check);
+    double p_1_energy = eps->get_value(p1);
+    for(int i=0; i<6; i++){
+        for(int q2=0; q2<q2_vals->get_len(); q2++){
+            double q2_energy = q2_vals->get_value(q2);
+            double E2 = sqrt(pow(q2_energy, 2) + pow(me_scaled, 2));
+            outer_vals->set_value(q2, (q2_energy / E2) * interior_integral_R1(q2, i));
+        }
+        results[i] = q2_vals->integrate(outer_vals);
+        results[i] *= pow(temp_cm, 5) / (pow(2, 4) * pow(2 * _PI_, 3) * pow(p_1_energy, 2));
+    }
+}
+
+// nu_e_collision_R2 to take care of neutrino-electron R2 collision integrals
+nu_e_collision_R2::nu_e_collision_R2(gel_linspace_gl* e, int p1_index, double a){
+    scaled_me = _electron_mass_ * a;
+    temp_cm = 1./a;
+    eps = new gel_linspace_gl(e);
+    p1 = p1_index;
+    p1_energy = eps->get_value(p1);
+    p1_me = p1_energy / scaled_me;
+    
+    int numgl_points = 50;
+    outer_vals = new dep_vars(numgl_points);
+    q3_vals = new dummy_vars(numgl_points);
+    for(int i=0; i<numgl_points; i++){
+        q3_vals->set_value(i, xvals_50[i]);
+        q3_vals->set_weight(i, wvals_50[i]*exp(xvals_50[i]));
+    }
+    
+    double E_cut_1 = p1_energy + pow(scaled_me,2)/(4*p1_energy);
+    double E_cut_2 = p1_energy + scaled_me*(p1_energy+scaled_me)/(2*p1_energy+scaled_me);
+    double E_cut_3 = sqrt(pow(p1_energy,2) + pow(scaled_me,2));
+    q_cut_1 = sqrt(pow(E_cut_1,2) - pow(scaled_me,2));
+    q_cut_2 = sqrt(pow(E_cut_2,2) - pow(scaled_me,2));
+    q_cut_3 = sqrt(pow(E_cut_3,2) - pow(scaled_me,2));
+    
+    q_trans_2 = new dep_vars(q3_vals->get_len());
+    q_lim_1 = new dep_vars(q3_vals->get_len());
+    double q3 = 0;
+    double E3_energy = 0;
+    double E_lim_1 = 0;
+    double E_trans_2;
+    for(int i=0; i<q3_vals->get_len(); i++){
+        q3 = q3_vals->get_value(i);
+        E3_energy = sqrt(pow(q3,2) + pow(scaled_me,2));
+        E_trans_2 = 0.5 * (E3_energy + q3 - 2*p1_energy + pow(scaled_me,2) / (E3_energy + q3 - 2*p1_energy));
+        E_lim_1 = 0.5 * (E3_energy - q3 - 2*p1_energy + pow(scaled_me,2) / (E3_energy - q3 - 2*p1_energy));
+        
+        q_trans_2->set_value(i, sqrt(pow(E_trans_2,2) - pow(scaled_me,2)));
+        q_lim_1->set_value(i, sqrt(pow(E_lim_1,2) - pow(scaled_me,2)));
+    }
+    
+    inner_vals = new dep_vars*[outer_vals->length()];
+    q2_vals = new dummy_vars*[q3_vals->get_len()];
+    
+    double p4_min = 0;
+    double p4_max = 0;
+    int count_min = 0;
+    int count_max = 0;
+    double q3_energy = 0;
+    double q2_min = 0;
+    double q2_max = 0;
+    p4_lows = new int[numgl_points];
+    p4_highs = new int[numgl_points];
+    for(int i=0; i<q3_vals->get_len(); i++){
+        q3 = q3_vals->get_value(i);
+        E3_energy = sqrt(pow(q3, 2) + pow(scaled_me, 2));
+        //idea here is to establish what we want p4 vals to be and then use those vals to reconstruct E3 vals
+        
+        //first we decide minimum and maximum p4 values. these will be only interpolated p4 values
+        //we have to consider cases 
+  
+        //case 1
+        if(p1_me < (sqrt(5)-1)/4){
+            //case 1a: m_e < E3 < E_cut_2 => m_e < E2 < E_lim_1
+            if(E3_energy < E_cut_2){
+                q2_min = 0;
+                q2_max = q_lim_1->get_value(i);
+            }
+            else{
+                q2_min = q_trans_2->get_value(i);
+                //case 1b: E_cut_2 < E3 < E_cut_1 => E_lim_2 < E2 < E_lim_1                  
+                if(E3_energy < E_cut_1){
+                    q2_max = q_lim_1->get_value(i);
+                }
+                //case 1c: E_cut_1 < E3 < inf => E_lim_2 < E2 < inf
+                else{
+                    q2_max = q3_vals->get_value(numgl_points-1);
+                } 
+            }
+        }
+        //case 2
+        else if(p1_me < 1/(2*sqrt(2))){
+            if(E3_energy < E_cut_2){
+                q2_min = 0;
+                
+                //case 2a: m_e < E3 < E_cut_1 => m_e < E2 < E_lim_1
+                if(E3_energy < E_cut_1){
+                    q2_max = q_lim_1->get_value(i);
+                }
+                //case 2b: m_e < E3 < inf => m_e < E2 < inf
+                else{
+                    q2_max = q3_vals->get_value(numgl_points-1);
+                }
+                
+            }
+            //case 2c: E_cut_2 < E3 < inf => E_lim_2 < E2 < inf
+            else{
+                q2_min = q_trans_2->get_value(i);
+                q2_max = q3_vals->get_value(numgl_points-1);
+            }
+        }
+        
+        //case 3
+        else if(p1_me < 1./2){
+            if(E3_energy < E_cut_2){   
+                q2_min = 0;
+                //case 3a: m_e < E3 < E_cut_1 => m_e < E2 < E_lim_1
+                if(E3_energy < E_cut_1){
+                    q2_max = q_lim_1->get_value(i);
+                }
+                //case 3b: E_cut_1 < E3 < E_cut_2 => m_e < E2 < inf
+                else{
+                    q2_max = q3_vals->get_value(numgl_points-1);
+                }
+            }
+            //case 3c: E_cut_2 < E3 < inf => E_lim_2 < E2 < inf
+            else{
+                q2_min = q_trans_2->get_value(i);
+                q2_max = q3_vals->get_value(numgl_points-1);
+            }
+        }
+        //case 4
+        else{
+            q2_max = q3_vals->get_value(numgl_points-1);
+            //case 4a: m_e < E3 < E_cut_2 => m_e < E2 < inf
+            if(E3_energy < E_cut_2){
+                q2_min = 0;
+            }
+            //case 4b: E_cut_2 < E3 < inf => E_lim_2 < E2 < inf
+            else{
+                q2_min = q_trans_2->get_value(i);
+            }
+        }
+        p4_min = p1_energy + sqrt(pow(q2_min, 2) + pow(scaled_me, 2)) - E3_energy;
+        p4_max = p1_energy + sqrt(pow(q2_max, 2) + pow(scaled_me, 2)) - E3_energy;
+        
+        double temp_energy = eps->get_value(0);
+        count_min = 0;
+        count_max = 0;
+        //count_min gives the number of items in epsilon that have energy less than the minimum p4 val; therefore first p4 val of interest is epsilon[count_min]
+        while(temp_energy < p4_min){
+            count_min++;
+            if(count_min >= eps->get_len()){
+                break;
+            }
+            temp_energy = eps->get_value(count_min);
+        }
+        
+        count_max = count_min;
+        
+        if(count_min != eps->get_len()){
+            while(temp_energy < p4_max){
+                count_max++;
+                if(count_max >= eps->get_len()){
+                    break;
+                }
+                temp_energy = eps->get_value(count_max);
+            }
+        }
+        count_max--;
+        
+        p4_lows[i] = count_min;
+        p4_highs[i] = count_max;
+        //count_max gives the index of the greatest element of epsilon that has energy less than the maximum p4 val; therefore last p4 val of interest is epsilon[count_max]
+        
+        //p4 vals will contain p4_min, epsilon values from indices count_min to count_max, inclusive, and p4_max
+        //therefore E2_vals needs to have 3+count_max-count_min things in it
+        //note that if count_min and count_max beyond the end of the array, count_max=count_min-1 so q2_vals will have length 2
+        q2_vals[i] = new dummy_vars(count_max-count_min+3);
+        q2_vals[i]->set_value(0, q2_min);
+        q2_vals[i]->set_value(count_max-count_min+2, q2_max);
+        
+        for(int j=count_min; j<=count_max; j++){
+            //q2 = p4 - p1 + q3
+            q2_vals[i]->set_value(j-count_min+1, sqrt(pow(eps->get_value(j) - p1_energy + E3_energy, 2) - pow(scaled_me, 2)));
+        }
+        
+        q2_vals[i]->set_trap_weights();
+        
+        inner_vals[i] = new dep_vars(count_max-count_min+3);
+    }
+    
+    F_values = new double**[6]();
+    for(int i=0; i<6; i++){
+        F_values[i] = new double*[eps->get_len()+1]();
+        for(int j=0; j<eps->get_len() + 2; j++){
+            F_values[i][j] = new double[q3_vals->get_len()];
+        }
+    } 
+    
+}
+
+nu_e_collision_R2::~nu_e_collision_R2(){
+    for(int i=0; i<6; i++){
+        for(int j=0; j<eps->get_len()+1; j++){
+            delete[] F_values[i][j];
+        }
+        delete[] F_values[i];
+    }
+    delete[] F_values;
+    
+    for(int i=0; i<q3_vals->get_len(); i++){
+        delete q2_vals[i];
+        delete inner_vals[i];
+    }
+    delete q2_vals;
+    delete inner_vals;
+    
+    delete outer_vals;
+    delete q3_vals;
+    
+    
+    delete eps;
+    delete q_trans_2;
+    delete q_lim_1;   
+}
+
+double nu_e_collision_R2::F_comp(freqs_ntT* input, int which_term, int q2, int q3, int check){
+    double p1_energy = eps->get_value(p1);
+    double q3_energy = q3_vals->get_value(q3);
+    double E3 = sqrt(pow(q3_energy, 2) + pow(scaled_me, 2));
+    double q2_energy = q2_vals[q3]->get_value(q2);
+    double E2 = sqrt(pow(q2_energy, 2) + pow(scaled_me, 2));
+    double p4_energy = p1_energy + E2 - E3;
+
+    int num = eps->get_len();
+    double f1 = input->get_value(which_term * num + p1);
+    double f2 = 1 / (exp(E2 * temp_cm / input->get_temp()) + 1);
+    double f3 = 1 / (exp(E3 * temp_cm / input->get_temp()) + 1);
+    double f4 = 0;
+    if(q2 != 0 && q2 != q2_vals[q3]->get_len() - 1){
+        f4 = input->get_value(which_term * num + p4_lows[q3] + q2 - 1);
+    } else {
+        // interpolation / extrapolation for p4
+        if(eps->get_value(num - 1) >= p4_energy){
+            int p4 = 0;
+            for(int j = 0; j < num; j++){
+                if(eps->get_value(j) < p4_energy){
+                    p4++;
+                }
+            }
+
+            int ids[4] = {which_term * num + p4 - 2, which_term * num + p4 - 1, which_term * num + p4, which_term * num + p4 + 1};
+            
+            if(p4 + 1 >= num){
+                ids[3] = which_term * num + p4 - 3;
+            }
+            if(p4 - 2 < 0){
+                ids[0] = which_term * num + p4 + 2;
+                if(p4 - 1 < 0){
+                    ids[1] = which_term * num + p4 + 3;
+                }
+            }
+            
+            
+            for(int i = 0; i < 4; i++){
+                double multiplier = 1;
+                int old_idx = ids[i] % num;
+                double old_x_val = eps->get_value(old_idx);
+                double old_val = input->get_value(ids[i]);
+                for(int j = 0; j < 4; j++){
+                    int old_idx2 = ids[j] % num;
+                    double mult_x = eps->get_value(old_idx2);
+                    if(i != j){
+                        multiplier *= (p4_energy - mult_x) / (old_x_val - mult_x);
+                    }
+                }
+                f4 += multiplier * log10(old_val);
+            }
+            f4 = pow(10, f4); 
+        } else {
+            double old_eps1 = eps->get_value(num - 2);
+            double old_f1 = input->get_value((which_term + 1) * num - 2);
+            double old_eps2 = eps->get_value(num - 1);
+            double old_f2 = input->get_value((which_term + 1) * num - 1);
+
+            double logy = ((p4_energy - old_eps1) * (log(old_f2) - log(old_f1)) / (old_eps2 - old_eps1)) + log(old_f1);
+            f4 = exp(logy);
+        }
+    }
+    return ((check + 1) * f3 * f4 * (1 - f1) * (1 - f2) - check * f1 * f2 * (1 - f3) * (1 - f4));
+}
+
+void nu_e_collision_R2::populate_F(freqs_ntT* input, int check){
+    int num = eps->get_len();
+    int size = q3_vals->get_len();
+    for(int i = 0; i < num + 2; i++){
+        for(int j = 0; j < size; j++){
+            int num3 = q2_vals[j]->get_len();
+            for(int k = 0; k < 6; k++){
+                if(i < num3){
+                    F_values[k][i][j] = F_comp(input, k, i, j, check);
+                } else {
+                    F_values[k][i][j] = 0;
+                }
+            }
+        }
+    }
+}
+
+double nu_e_collision_R2::integrated_M_1_prime(double y, double E3, int which_term){
+    double me_square = pow(scaled_me, 2);
+    double mult1;
+    double mult2;
+    if(which_term < 2){
+        mult1 = pow(2, 3) * pow(_GF_ * (2 * _Weinberg_ + 1), 2);
+        mult2 = 2 * _Weinberg_ / (2 * _Weinberg_ + 1);
+    } else {
+        mult1 = pow(2, 3) * pow(_GF_ * (2 * _Weinberg_ - 1), 2);
+        mult2 = 2 * _Weinberg_ / (2 * _Weinberg_ - 1);
+    }
+    double result = (pow(p1_energy-E3,2) - pow(scaled_me,2)) * (pow(p1_energy-E3,2) + (2 * mult2 - 1)*pow(scaled_me,2)) * y;
+    result -= (2./3) *  (pow(p1_energy-E3,2) + (mult2 - 1) * pow(scaled_me,2)) * pow(y,3);
+    result += pow(y,5)/5;
+    result *= mult1;
+
+    return result;
+}
+
+double nu_e_collision_R2::M_1_1(double q2, double E2, double E3, int which_term){
+    double lower_bound = p1_energy - E3 + E2 - q2;
+    double upper_bound = p1_energy - E3 + E2 + q2;
+    
+    return integrated_M_1_prime(upper_bound, E3, which_term) - integrated_M_1_prime(lower_bound, E3, which_term);
+}
+
+double nu_e_collision_R2::M_1_2(double q3, double E3, int which_term){
+    double lower_bound = p1_energy - q3;
+    double upper_bound = p1_energy + q3;
+    
+    return integrated_M_1_prime(upper_bound, E3, which_term) - integrated_M_1_prime(lower_bound, E3, which_term);
+}
+
+double nu_e_collision_R2::M_1_3(double q2, double E2, double q3, double E3, int which_term){
+    double lower_bound = E3 - p1_energy - E2 + q2;
+    double upper_bound = p1_energy + q3;
+    
+    return integrated_M_1_prime(upper_bound, E3, which_term) - integrated_M_1_prime(lower_bound, E3, which_term);
+}
+
+double nu_e_collision_R2::M_1_4(double q2, double E2, double q3, double E3, int which_term){
+    double lower_bound = q3 - p1_energy;
+    double upper_bound = p1_energy - E3 + E2 + q2;
+    
+    return integrated_M_1_prime(upper_bound, E3, which_term) - integrated_M_1_prime(lower_bound, E3, which_term);
+}
+
+double nu_e_collision_R2::integrated_M_2_prime(double y, double E3, int which_term){
+    double me_square = pow(scaled_me, 2);
+    double mult1 = pow(2,5) * pow(_GF_,2) * pow(_Weinberg_,2);
+    double mult2;
+    if(which_term < 2){
+        mult2 = - (2 * _Weinberg_ + 1) / (2 * _Weinberg_);
+    } else {
+        mult2 = - (2 * _Weinberg_ - 1) / (2 * _Weinberg_);
+    }
+    double result = (pow(p1_energy-E3,2) - pow(scaled_me,2)) * (pow(p1_energy-E3,2) + (2 * mult2 - 1)*pow(scaled_me,2)) * y;
+    result -= (2./3) *  (pow(p1_energy-E3,2) + (mult2 - 1) * pow(scaled_me,2)) * pow(y,3);
+    result += pow(y,5)/5;
+    result *= mult1;
+    return result;
+}
+
+double nu_e_collision_R2::M_2_1(double q2, double E2, double E3, int which_term){
+    double lower_bound = p1_energy - E3 + E2 - q2;
+    double upper_bound = p1_energy - E3 + E2 + q2;
+    
+    return integrated_M_2_prime(upper_bound, E3, which_term) - integrated_M_2_prime(lower_bound, E3, which_term);
+}
+
+double nu_e_collision_R2::M_2_2(double q3, double E3, int which_term){
+    double lower_bound = p1_energy - q3;
+    double upper_bound = p1_energy + q3;
+    
+    return integrated_M_2_prime(upper_bound, E3, which_term) - integrated_M_2_prime(lower_bound, E3, which_term);
+}
+
+double nu_e_collision_R2::M_2_3(double q2, double E2, double q3, double E3, int which_term){
+    double lower_bound = E3 - p1_energy - E2 + q2;
+    double upper_bound = p1_energy + q3;
+    
+    return integrated_M_2_prime(upper_bound, E3, which_term) - integrated_M_2_prime(lower_bound, E3, which_term);
+}
+
+double nu_e_collision_R2::M_2_4(double q2, double E2, double q3, double E3, int which_term){
+    double lower_bound = q3 - p1_energy;
+    double upper_bound = p1_energy - E3 + E2 + q2;
+    
+    return integrated_M_2_prime(upper_bound, E3, which_term) - integrated_M_2_prime(lower_bound, E3, which_term);
+}
+
+double nu_e_collision_R2::inner_integral(int which_term, int q3){
+    double q3_momentum = q3_vals->get_value(q3);
+    double E3 = sqrt(pow(q3_momentum,2) + pow(scaled_me,2));
+    //case 1
+    if(p1_me < (sqrt(5)-1)/4.){
+        //case 1a
+        if(q3_momentum < q_cut_3){
+            for(int q2=0; q2<q2_vals[q3]->get_len(); q2++){
+                double q2_momentum = q2_vals[q3]->get_value(q2);
+                double E2 = sqrt(pow(q2_momentum,2) + pow(scaled_me,2));
+                
+                //case 1ai
+                if(q2_momentum < q3_momentum){
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_1(q2_momentum, E2, E3, which_term) + M_1_1(q2_momentum, E2, E3, which_term)));
+                }
+                //case 1aii
+                else if(q2_momentum < q_trans_2->get_value(q3)){
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_2(q3_momentum, E3, which_term) + M_1_2(q3_momentum, E3, which_term)));
+                }
+                //case 1aiii
+                else{
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_3(q2_momentum, E2, q3_momentum, E3, which_term) + M_1_3(q2_momentum, E2, q3_momentum, E3, which_term)));
+                }    
+            }
+        }
+        //case 1b
+        else if(q3_momentum < q_cut_2){
+            for(int q2=0; q2<q2_vals[q3]->get_len(); q2++){
+                double q2_momentum = q2_vals[q3]->get_value(q2);
+                double E2 = sqrt(pow(q2_momentum,2) + pow(scaled_me,2));
+                
+                //case 1bi
+                if(q2_momentum < q_trans_2->get_value(q3)){
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_1(q2_momentum, E2, E3, which_term) + M_1_1(q2_momentum, E2, E3, which_term)));
+                }
+                //case 1bii
+                else if(q2_momentum < q3_momentum){
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_4(q2_momentum, E2, q3_momentum, E3, which_term) + M_1_4(q2_momentum, E2, q3_momentum, E3, which_term)));
+                }
+                //case 1biii
+                else{
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_3(q2_momentum, E2, q3_momentum, E3, which_term) + M_1_3(q2_momentum, E2, q3_momentum, E3, which_term)));
+                }
+                
+            }
+        }
+        //case 1c
+        else if(q3_momentum < q_cut_1){
+            for(int q2=0; q2<q2_vals[q3]->get_len(); q2++){
+                double q2_momentum = q2_vals[q3]->get_value(q2);
+                double E2 = sqrt(pow(q2_momentum,2) + pow(scaled_me,2));
+                
+                //case 1ci
+                if(q2_momentum < q3_momentum){
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_4(q2_momentum, E2, q3_momentum, E3, which_term) + M_1_4(q2_momentum, E2, q3_momentum, E3, which_term)));
+                }
+                //case 1cii
+                else{
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_3(q2_momentum, E2, q3_momentum, E3, which_term) + M_1_3(q2_momentum, E2, q3_momentum, E3, which_term)));
+                }
+                
+            }
+        }
+        //case 1d
+        else{
+            for(int q2=0; q2<q2_vals[q3]->get_len(); q2++){
+                double q2_momentum = q2_vals[q3]->get_value(q2);
+                double E2 = sqrt(pow(q2_momentum,2) + pow(scaled_me,2));
+                
+                //case 1ci
+                if(q2_momentum < q3_momentum){
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_4(q2_momentum, E2, q3_momentum, E3, which_term) + M_1_4(q2_momentum, E2, q3_momentum, E3, which_term)));
+                }
+                //case 1cii
+                else{
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_3(q2_momentum, E2, q3_momentum, E3, which_term) + M_1_3(q2_momentum, E2, q3_momentum, E3, which_term)));
+                }
+                
+            }
+        }
+    }
+    
+    //case 2
+    else if(p1_me < 1./(2 * sqrt(2))){
+        //case 2a
+        if(q3_momentum<q_cut_3){
+            for(int q2=0; q2<q2_vals[q3]->get_len(); q2++){
+                double q2_momentum = q2_vals[q3]->get_value(q2);
+                double E2 = sqrt(pow(q2_momentum,2) + pow(scaled_me,2));
+                
+                //case 2ai
+                if(q2_momentum < q3_momentum){
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_1(q2_momentum, E2, E3, which_term) + M_1_1(q2_momentum, E2, E3, which_term)));
+                }
+                //case 2aii
+                else if(q2_momentum < q_trans_2->get_value(q3)){
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_2(q3_momentum, E3, which_term) + M_1_2(q3_momentum, E3, which_term)));
+                }
+                //case 2aiii
+                else{
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_3(q2_momentum, E2, q3_momentum, E3, which_term) + M_1_3(q2_momentum, E2, q3_momentum, E3, which_term)));
+                }
+                
+            }
+        }
+        //case 2b
+        else if(q3_momentum<q_cut_1){
+            for(int q2=0; q2<q2_vals[q3]->get_len(); q2++){
+                double q2_momentum = q2_vals[q3]->get_value(q2);
+                double E2 = sqrt(pow(q2_momentum,2) + pow(scaled_me,2));
+                
+                //case 2bi
+                if(q2_momentum < q_trans_2->get_value(q3)){
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_1(q2_momentum, E2, E3, which_term) + M_1_1(q2_momentum, E2, E3, which_term)));
+                }
+                //case 2bii
+                else if(q2_momentum < q3_momentum){
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_4(q2_momentum, E2, q3_momentum, E3, which_term) + M_1_4(q2_momentum, E2, q3_momentum, E3, which_term)));
+                }
+                //case 2biii
+                else{
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_3(q2_momentum, E2, q3_momentum, E3, which_term) + M_1_3(q2_momentum, E2, q3_momentum, E3, which_term)));
+                }
+                
+            }
+        }
+        //case 2c
+        else if(q3_momentum<q_cut_2){
+            for(int q2=0; q2<q2_vals[q3]->get_len(); q2++){
+                double q2_momentum = q2_vals[q3]->get_value(q2);
+                double E2 = sqrt(pow(q2_momentum,2) + pow(scaled_me,2));
+                
+                //case 2ci
+                if(q2_momentum < q_trans_2->get_value(q3)){
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_1(q2_momentum, E2, E3, which_term) + M_1_1(q2_momentum, E2, E3, which_term)));
+                }
+                //case 2cii
+                else if(q2_momentum < q3_momentum){
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_4(q2_momentum, E2, q3_momentum, E3, which_term) + M_1_4(q2_momentum, E2, q3_momentum, E3, which_term)));
+                }
+                //case 2ciii
+                else{
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_3(q2_momentum, E2, q3_momentum, E3, which_term) + M_1_3(q2_momentum, E2, q3_momentum, E3, which_term)));
+                }
+                
+            }
+        }
+        //case 2d
+        else{
+            for(int q2=0; q2<q2_vals[q3]->get_len(); q2++){
+                double q2_momentum = q2_vals[q3]->get_value(q2);
+                double E2 = sqrt(pow(q2_momentum,2) + pow(scaled_me,2));
+                
+                //case 2di
+                if(q2_momentum < q3_momentum){
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_4(q2_momentum, E2, q3_momentum, E3, which_term) + M_1_4(q2_momentum, E2, q3_momentum, E3, which_term)));
+                }
+                //case 2dii
+                else{
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_3(q2_momentum, E2, q3_momentum, E3, which_term) + M_1_3(q2_momentum, E2, q3_momentum, E3, which_term)));
+                }
+                
+            }
+        }
+        
+    }
+    
+    //case 3
+    else if(p1_me < 0.5){
+        //case 3a
+        if(q3_momentum<q_cut_1){
+            for(int q2=0; q2<q2_vals[q3]->get_len(); q2++){
+                double q2_momentum = q2_vals[q3]->get_value(q2);
+                double E2 = sqrt(pow(q2_momentum,2) + pow(scaled_me,2));
+                
+                //case 3ai
+                if(q2_momentum < q3_momentum){
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_1(q2_momentum, E2, E3, which_term) + M_1_1(q2_momentum, E2, E3, which_term)));
+                }
+                //case 3aii
+                else if(q2_momentum < q_trans_2->get_value(q3)){
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_2(q3_momentum, E3, which_term) + M_1_2(q3_momentum, E3, which_term)));
+                }
+                //case 3aiii
+                else{
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_3(q2_momentum, E2, q3_momentum, E3, which_term) + M_1_3(q2_momentum, E2, q3_momentum, E3, which_term)));
+                }
+                
+            }
+        }
+        //case 3b
+        else if(q3_momentum<q_cut_3){
+            for(int q2=0; q2<q2_vals[q3]->get_len(); q2++){
+                double q2_momentum = q2_vals[q3]->get_value(q2);
+                double E2 = sqrt(pow(q2_momentum,2) + pow(scaled_me,2));
+                
+                //case 3bi
+                if(q2_momentum < q3_momentum){
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_1(q2_momentum, E2, E3, which_term) + M_1_1(q2_momentum, E2, E3, which_term)));
+                }
+                //case 3bii
+                else if(q2_momentum < q_trans_2->get_value(q3)){
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_2(q3_momentum, E3, which_term) + M_1_2(q3_momentum, E3, which_term)));
+                }
+                //case 3biii
+                else{
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_3(q2_momentum, E2, q3_momentum, E3, which_term) + M_1_3(q2_momentum, E2, q3_momentum, E3, which_term)));
+                }
+                
+            }
+        }
+        //case 3c
+        else if(q3_momentum<q_cut_2){
+            for(int q2=0; q2<q2_vals[q3]->get_len(); q2++){
+                double q2_momentum = q2_vals[q3]->get_value(q2);
+                double E2 = sqrt(pow(q2_momentum,2) + pow(scaled_me,2));
+                
+                //case 3ci
+                if(q2_momentum < q_trans_2->get_value(q3)){
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_1(q2_momentum, E2, E3, which_term) + M_1_1(q2_momentum, E2, E3, which_term)));
+                }
+                //case 3cii
+                else if(q2_momentum < q3_momentum){
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_4(q2_momentum, E2, q3_momentum, E3, which_term) + M_1_4(q2_momentum, E2, q3_momentum, E3, which_term)));
+                }
+                //case 3ciii
+                else{
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_3(q2_momentum, E2, q3_momentum, E3, which_term) + M_1_3(q2_momentum, E2, q3_momentum, E3, which_term)));
+                }
+                
+            }
+        }
+        //case 3d
+        else{
+            for(int q2=0; q2<q2_vals[q3]->get_len(); q2++){
+                double q2_momentum = q2_vals[q3]->get_value(q2);
+                double E2 = sqrt(pow(q2_momentum,2) + pow(scaled_me,2));
+                
+                //case 3di
+                if(q2_momentum < q3_momentum){
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_4(q2_momentum, E2, q3_momentum, E3, which_term) + M_1_4(q2_momentum, E2, q3_momentum, E3, which_term)));
+                }
+                //case 3dii
+                else{
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_3(q2_momentum, E2, q3_momentum, E3, which_term) + M_1_3(q2_momentum, E2, q3_momentum, E3, which_term)));
+                }
+                
+            }
+        }        
+    }
+    
+    //case 4
+    else{
+         //case 4a
+        if(q3_momentum<q_cut_1){
+            for(int q2=0; q2<q2_vals[q3]->get_len(); q2++){
+                double q2_momentum = q2_vals[q3]->get_value(q2);
+                double E2 = sqrt(pow(q2_momentum,2) + pow(scaled_me,2));
+                
+                //case 4ai
+                if(q2_momentum < q3_momentum){
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_1(q2_momentum, E2, E3, which_term) + M_1_1(q2_momentum, E2, E3, which_term)));
+                }
+                //case 4aii
+                else{
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_2(q3_momentum, E3, which_term) + M_1_2(q3_momentum, E3, which_term)));
+                }
+                
+            } 
+        }
+        //case 4b
+        else if(q3_momentum<q_cut_3){
+            for(int q2=0; q2<q2_vals[q3]->get_len(); q2++){
+                double q2_momentum = q2_vals[q3]->get_value(q2);
+                double E2 = sqrt(pow(q2_momentum,2) + pow(scaled_me,2));
+                
+                //case 4bi
+                if(q2_momentum < q3_momentum){
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_1(q2_momentum, E2, E3, which_term) + M_1_1(q2_momentum, E2, E3, which_term)));
+                }
+                //case 4bii
+                else if(q2_momentum < q_trans_2->get_value(q3)){
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_2(q3_momentum, E3, which_term) + M_1_2(q3_momentum, E3, which_term)));
+                }
+                //case 4biii
+                else{
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_3(q2_momentum, E2, q3_momentum, E3, which_term) + M_1_3(q2_momentum, E2, q3_momentum, E3, which_term)));
+                }
+                
+            }
+        }
+        //case 4c
+        else if(q3_momentum<q_cut_2){
+            for(int q2=0; q2<q2_vals[q3]->get_len(); q2++){
+                double q2_momentum = q2_vals[q3]->get_value(q2);
+                double E2 = sqrt(pow(q2_momentum,2) + pow(scaled_me,2));
+                
+                //case 4ci
+                if(q2_momentum < q_trans_2->get_value(q3)){
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_1(q2_momentum, E2, E3, which_term) + M_1_1(q2_momentum, E2, E3, which_term)));
+                }
+                //case 4cii
+                else if(q2_momentum < q3_momentum){
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_4(q2_momentum, E2, q3_momentum, E3, which_term) + M_1_4(q2_momentum, E2, q3_momentum, E3, which_term)));
+                }
+                //case 4ciii
+                else{
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_3(q2_momentum, E2, q3_momentum, E3, which_term) + M_1_3(q2_momentum, E2, q3_momentum, E3, which_term)));
+                }
+                
+            }
+        }
+        //case 4d
+        else{
+            for(int q2=0; q2<q2_vals[q3]->get_len(); q2++){
+                double q2_momentum = q2_vals[q3]->get_value(q2);
+                double E2 = sqrt(pow(q2_momentum,2) + pow(scaled_me,2));
+                
+                //case 4di
+                if(q2_momentum < q3_momentum){
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_4(q2_momentum, E2, q3_momentum, E3, which_term) + M_1_4(q2_momentum, E2, q3_momentum, E3, which_term)));
+                }
+                //case 4dii
+                else{
+                    inner_vals[q3]->set_value(q2, (q2_momentum / E2) * F_values[which_term][q2][q3] * (M_2_3(q2_momentum, E2, q3_momentum, E3, which_term) + M_1_3(q2_momentum, E2, q3_momentum, E3, which_term)));
+                }
+            }
+            
+        }  
+        
+    }
+    double result = q2_vals[q3]->integrate(inner_vals[q3]);
+    return result;
+}
+
+double nu_e_collision_R2::whole_integral(freqs_ntT* input, double a, double check, double* results){
+    if(p1_energy == 0){
+        for(int i=0; i<6; i++){
+            results[i] = 0;
+        }
+    } else {
+        //populate F values
+        this->populate_F(input, check);
+        double q3_momentum = 0;
+        double E3 = 0;
+        for(int i = 0; i < 6; i++){
+            for(int q3=0; q3<q3_vals->get_len(); q3++){
+                q3_momentum = q3_vals->get_value(q3);
+                E3 = sqrt(pow(q3_momentum,2) + pow(scaled_me,2));
+                outer_vals->set_value(q3, (q3_momentum / E3) * inner_integral(i, q3));
+            }
+            results[i] = q3_vals->integrate(outer_vals);
+            results[i] *= pow(temp_cm, 5) / (pow(2,4) * pow(2*_PI_,3) * pow(p1_energy,2));
         }
     }
 }

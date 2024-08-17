@@ -332,8 +332,8 @@ double linspace_and_gl::get_max_linspace(){
 
 gel_linspace_gl::gel_linspace_gl(double min_lin, double max_lin, int num):dummy_vars(num)
 {
-    num_gel = 5;
-    num_lin = num - 10;
+    num_gel = 10;
+    num_lin = num - 15;
     num_gl = 5;
     double dx_val = (max_lin - min_lin) / (num_lin - 2);
     double E_low = int(min_lin / dx_val) * dx_val;
@@ -341,8 +341,8 @@ gel_linspace_gl::gel_linspace_gl(double min_lin, double max_lin, int num):dummy_
     double total_length = num_gel + num_lin + num_gl;
     for(int i = 0; i < total_length; i++){
         if(i < num_gel){
-            values[i] = (E_low * gel_vals_5[i] + E_low) / 2;
-            weights[i] = gel_weights_5[i] * (E_low / 2);
+            values[i] = (E_low * gel_vals_10[i] + E_low) / 2;
+            weights[i] = gel_weights_10[i] * (E_low / 2);
         } else if(i < num_gel + num_lin){
             values[i] = E_low + dx_val * (i - num_gel);
             if(i == num_gel || i == num_gel + num_lin - 1){

@@ -4,6 +4,7 @@
 #include "derivatives.hh"
 #include "constants.hh"
 #include "decays.h"
+#include "gl_vals.hh"
 #include <string>
 #include <cmath>
 #include <iostream>
@@ -34,6 +35,11 @@ derivatives::~derivatives(){
 
 dummy_vars* derivatives::retrieve_separations(){
     return y_values->get_separations();
+}
+
+
+freqs_ntT* derivatives::get_yvalues(){
+    return y_values;
 }
 
 void derivatives::update(double new_a_start, double new_a_end){
@@ -155,13 +161,18 @@ int main(){
     */
     double a_start = 0.1;
     double a_end = 0.25;
-    int num = 101;
+    int num = 100;
     int scale_num = 3;
     
     double ms = 300;
     double theta = 1.22e-5;
     double time = 0;
     double temp = 1 / a_start;
+
+    /* for collision tests
+    double a = 0.1;
+    temp = 1/a;*/
+    
 
     double E_low = min_low(ms);
     double E_high = (ms + 1) / 2;
@@ -190,6 +201,32 @@ int main(){
     derivatives* sim = new derivatives(num, E_low, E_high, a_low, a_high, ms, theta, freqs, ns, time, temp);
 
     // testing code
+    /*int p1_idx = 17;
+    nu_e_collision_R2* col = new nu_e_collision_R2(eps, p1_idx, a);
+    nu_e_collision_R1* col2 = new nu_e_collision_R1(eps, p1_idx, a);
+    double p1_energy = eps->get_value(p1_idx);
+    cout<<"p1 = " << p1_energy << endl;
+    double* results = new double[6];
+    double* results2 = new double[6];
+    cout << "R1 Terms" << endl;
+    col2->populate_F(input, 0);
+    col2->whole_integral(input, 0, results);
+    col2->populate_F(input, 1);
+    col2->whole_integral(input, 1, results2);
+    for(int i = 0; i < 6; i++){
+        cout << "Forward: " << results[i] << ", Backward: " << results2[i] << ", percentage diff = " << 200 * (results[i] - results2[i]) / (results[i] + results2[i]) << "%" << endl;
+    }
+    double* results3 = new double[6];
+    double* results4 = new double[6];
+    cout << "R2 Terms" << endl;
+    col->populate_F(input, 0);
+    col->whole_integral(input, a, 0, results3);
+    col->populate_F(input, 1);
+    col->whole_integral(input, a, 1, results4);
+    for(int i = 0; i < 6; i++){
+        cout << "Forward: " << results3[i] << ", Backward: " << results4[i] << ", percentage diff = " << 200 * (results3[i] - results4[i]) / (results3[i] + results4[i]) << "%" << endl;
+    }*/
+
     /*integration* inter = new integration(eps, 17);
     double* results = new double[6];
     double* results2 = new double[6];
@@ -217,10 +254,9 @@ int main(){
     delete inter;
     delete results;
     delete results2;*/
-    
+
     sim->set_ics(a_start, input, 0.01 * a_start);
     dummy_vars* a_separations = sim->retrieve_separations();
-    
     for(int i = 0; i < a_separations->get_len(); i++){
         double a = a_separations->get_value(i);
         cout << a << endl;
@@ -238,6 +274,8 @@ int main(){
         a_high = scales->get_value(j + 1);
         sim->update(a_low, a_high);
         a_separations = sim->retrieve_separations();
+        freqs_ntT* use = sim->get_yvalues();
+        gel_linspace_gl* use2 = use->get_eps();
         for(int i = 0; i < a_separations->get_len(); i++){
             double a = a_separations->get_value(i);
             cout << a << endl;

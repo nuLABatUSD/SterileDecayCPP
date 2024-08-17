@@ -10,6 +10,7 @@ const double _GF_ = 1.16637e-11;
 //const double _delta_m_squared_ = 0.753e-16;
 const double _W_boson_ = 80360;
 const double _Z_boson_ = 91187;
+const double _Weinberg_ = 1 - pow(_W_boson_ / _Z_boson_, 2);
 const double _fine_structure_ = 7.29735e-3;
 const double _pion_decay_ = 131;
 const double _gwd_ = 10.75;

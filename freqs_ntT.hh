@@ -72,6 +72,11 @@ class integration
     double*** Fvv_values;
     double*** Fvvbar_values;
 
+    double temp_cm;
+    double me_scaled;
+    dummy_vars* p2_vals;
+
+
     public:
     integration(gel_linspace_gl*, int);
     integration(integration*);
@@ -87,10 +92,85 @@ class integration
     double K1(double, double);
     double K2(double, double, double);
     double K3(double, double, double);
-    double interior_integral(freqs_ntT*, int, int);
+    
+    double interior_integral(int, int);
     void whole_integral(freqs_ntT*, double, double, double*);
-
-
 };
 
+class nu_e_collision_R1
+{
+    protected:
+    int p1;
+    int count;
+    int* p4_lows;
+    int* p4_highs;
+    double temp_cm;
+    double me_scaled;
+    gel_linspace_gl* eps;
+    dep_vars* outer_vals;
+    dep_vars** inner_vals;
+    dummy_vars* q2_vals;
+    dummy_vars** q3_vals;
+    double*** F_values;
+    
+    public:
+    nu_e_collision_R1(gel_linspace_gl*, int, double);
+    ~nu_e_collision_R1();
+
+    double get_temp_cm();
+    dummy_vars** get_q3();
+    double M1_R1(double, double, int);
+    double M2_R1(double, double, int);
+    double F_comp(freqs_ntT*, int, int, int, int);
+    void populate_F(freqs_ntT*, int);
+    void print_F(int);
+    double interior_integral_R1(int, int);
+    void whole_integral(freqs_ntT*, double, double*);
+    
+};
+
+class nu_e_collision_R2
+{
+    protected:
+    gel_linspace_gl* eps;
+    int p1;
+    double p1_energy;
+    double scaled_me;
+    double p1_me;
+    double temp_cm;
+    
+    double q_cut_1;
+    double q_cut_2;
+    double q_cut_3;
+    dep_vars* q_trans_2;
+    dep_vars* q_lim_1;
+    int* p4_lows;
+    int* p4_highs;
+
+    dummy_vars* q3_vals;
+    dep_vars* outer_vals;
+    dummy_vars** q2_vals;
+    dep_vars** inner_vals;
+    double*** F_values;
+    
+    
+    public:
+    nu_e_collision_R2(gel_linspace_gl*, int, double);
+    double F_comp(freqs_ntT*, int, int, int, int);
+    void populate_F(freqs_ntT*, int);
+    double integrated_M_1_prime(double, double, int);
+    double M_1_1(double, double, double, int);
+    double M_1_2(double, double, int);
+    double M_1_3(double, double, double, double, int);
+    double M_1_4(double, double, double, double, int);
+    double integrated_M_2_prime(double, double, int);
+    double M_2_1(double, double, double, int);
+    double M_2_2(double, double, int);
+    double M_2_3(double, double, double, double, int);
+    double M_2_4(double, double, double, double, int);
+    double inner_integral(int, int);
+    double whole_integral(freqs_ntT*, double, double, double*);
+    
+    ~nu_e_collision_R2();
+};
 #endif
