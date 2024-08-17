@@ -1,4 +1,4 @@
-#include "ODESolve.hh"
+#include "ODESolve_new.hh"
 #include "arrays.hh"
 
 class expo : public ODESolve<dep_vars>
@@ -23,3 +23,10 @@ class spin : public ODESolve<three_vector>
         void print_state();
 };
 
+class dumb : public ODESolve<dep_vars>
+{
+    public:
+        dumb();
+        
+        void f(double, dep_vars*, dep_vars*);
+};

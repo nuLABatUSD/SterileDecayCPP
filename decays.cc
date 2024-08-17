@@ -34,6 +34,7 @@ double get_rate(double ms, double theta, int identifier){
         default:
             cout << "Error: this identifier number is not supported" << endl;
     }
+    return 0;
 }
 
 double get_lifetime(double ms, double theta){
@@ -212,12 +213,15 @@ void compute_dPdtdE(gel_linspace_gl* energies_cm, double ms, double theta, doubl
     int num_bins = energies_cm->get_len();
 
     dummy_vars* energy_bins = new dummy_vars(num_bins);
+    dummy_vars* bin_widths = new dummy_vars(num_bins);
 
     for(int i = 0; i < num_bins; i++){
         energy_bins->set_value(i,energies_cm->get_value(i) * temp_cm);
+        if (i > 0)
+            bin_widths->set_value(i-1, energy_bins->get_value(i) - energy_bins->get_value(i-1));
     }
 
-    double bin_width = energy_bins->get_value(1) - energy_bins->get_value(0);
+    // double bin_width = energy_bins->get_value(1) - energy_bins->get_value(0);
 
     for(int i = 0; i < num_bins; i++){
         // define decay rates
@@ -229,16 +233,20 @@ void compute_dPdtdE(gel_linspace_gl* energies_cm, double ms, double theta, doubl
 
         // defining relevant variables
         double energy = energy_bins->get_value(i);
+        double bin_width = 0;
+        if (i < num_bins-1)
+            bin_width = bin_widths->get_value(i);
         double d2 = 0;
         double d3_2 = 0;
         double d3_4 = 0;
         double d4_2 = 0;
         double d4_3 = 0;
         double d4_4 = 0;
+        
 
         // decay 1 contributions (all identical)
         double d1 = get_decay_type_one(rate_1, energy, bin_width, ms, 0);
-
+        
         // decay 2 contributions (all identical)
         if(ms >= _neutral_pion_mass_){
             d2 = get_decay_type_one(rate_2, energy, bin_width, ms, _neutral_pion_mass_);
@@ -256,7 +264,6 @@ void compute_dPdtdE(gel_linspace_gl* energies_cm, double ms, double theta, doubl
             d4_3 = get_decay_type_three(rate_4, energy, ms);
             d4_4 = get_decay_type_four(rate_4, energy, ms, _muon_mass_);
         }
-        
         // decay assignments
         pe->set_value(i, d1 + d2 + d3_4 + d4_3 + d4_4);
         pae->set_value(i, d3_4 + d4_3 + d4_4);
@@ -264,6 +271,7 @@ void compute_dPdtdE(gel_linspace_gl* energies_cm, double ms, double theta, doubl
         pam->set_value(i, d3_2 + d3_4 + d4_2 + d4_3 + d4_4);
         pt->set_value(i, d1 + d2);
         pat->set_value(i, 0);
+        
     }
     delete energy_bins;
 }

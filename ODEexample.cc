@@ -38,6 +38,20 @@ void spin::print_state()
     cout << "| L | = " << y_values->magnitude() << endl;
 }
 
+dumb::dumb() : ODESolve()
+{
+    y_values = new dep_vars(4);
+}
+
+void dumb::f(double x, dep_vars* y, dep_vars* z)
+{
+    z->set_value(0, 1);
+    z->set_value(1, x);
+    z->set_value(2, x*x);
+    z->set_value(3, 0);
+    return;
+}
+
 int main()
 {    
     expo* sim = new expo;
@@ -46,11 +60,8 @@ int main()
     dep_vars* y0 = new dep_vars(ics, 4);
     sim->set_ics(0, y0, 0.1);
 
-    sim->print_state();
 
-    sim->run(100,10,5.0,"output2.csv");
-
-    sim->print_state();
+    sim->run(100,10,5.0,"output2.csv", true);
 
     cout << "======================" << endl;
 
@@ -58,9 +69,16 @@ int main()
     three_vector* L0 = new three_vector(0., 0., 1.);
 
     sim2->set_ics(0, L0, 0.1);
-    sim2->print_state();
 
-    sim2->run(100, 10, 5.0, "output3.csv");
-    sim2->print_state();
+    sim2->run(100, 10, 5.0, "output3.csv", true);
+    
+    dumb* sim3 = new dumb;
+    double ics2[] = {0.0, 0.0, 0.0, 0.0};
+    
+    dep_vars* y1 = new dep_vars(ics2, 4);
+    sim3->set_ics(0, y1, 0.1);
+    
+    sim3->run(100, 10, 100, "output4.csv", true);
     return 1;
 }
+

@@ -19,6 +19,21 @@ const double eps = 1e-8;
 const double TINY = 1e-22;
 const double Safety = 0.9;
 
+
+/*************************
+/ template class ODESolve
+/ Usage: create a class that inherits from ODESolve with a dep_vars inherited class (works only for a dep_vars inherited class, or dep_vars)
+/ 
+/ The constructor of the solver class must allocate the dep_vars object. The destructor should not. ODESolve destructor deletes y_values
+/
+/ protected variables (x, y, dx) is the current state of the system
+/ set_ics sets these values
+/ RKCK_step steps using Cash Karp, resulting in the next x, y, dx
+/
+/ f(double, dep_vars*, dep_vars*) must be defined for dy/dx = f(x, y)
+/
+*************************/
+
 template <class dep>
 class ODESolve
 {
@@ -26,40 +41,47 @@ class ODESolve
         double x_value;
         dep* y_values;
         double dx_value;
+        int total_ODE_steps;
+        int total_ODE_rejected_steps;
 
+        
     public:
         ODESolve();
         ~ODESolve();
-
+        
         void set_ics(double, dep*, double);
-        void shift_x();
-        virtual void f(double, dep*, dep*) = 0;
-        void RKCash_Karp(double, dep*, double, double*, dep*, dep*);
-        bool step_accept(dep*, dep*, dep*, double, double*);
-        bool RKCK_step(double, dep*, double, double*, dep*, double*);
-        bool ODEOneRun(double x0, dep* y0, double dx0, int N_step, int dN, double x_final, double* x, dep* y, double* dx, const std::string& file_name, bool verbose = false);
-
-        bool run(int N_step, int dN, double x_final, const std::string& file_name, bool verbose = false);
-
         void print_state();
-        void print_csv(ostream&, double, double, dep*);
+        void print_csv(ostream&);
+        
+        virtual void f(double, dep*, dep*) = 0;
+        void f_evaluate(dep*);
+        
+        void RKCash_Karp(double, dep*, double, double*, dep*, dep*);
+        bool step_accept(dep*, dep*, dep*, double, double*, bool=false, bool=false);
+        
+        bool RKCK_step(double, dep*, double, double*, dep*, double*);
+        bool RKCK_step_advance();
+        bool ODEOneRun(int N_step, int dN, double x_final, const std::string& file_name, bool verbose = false, bool print_csv_file = true);
+        
+        bool run(int N_step, int dN, double x_final, const std::string& file_name, bool verbose = false);     
+        
+   
 };
 
-//#include "ODESolve.inl"
 
 template <class dep>
 ODESolve<dep>::ODESolve()
 {
-    x_value = 0.0;
-    dx_value = 1.0;
-
+    x_value = 0.;
+    dx_value = 1.;
+    
+    total_ODE_steps = 0;
+    total_ODE_rejected_steps = 0;
 }
 
 template <class dep>
 ODESolve<dep>::~ODESolve()
-{
-    delete y_values;
-}
+{   delete y_values; }
 
 template <class dep>
 void ODESolve<dep>::set_ics(double x0, dep* y0, double dx0)
@@ -70,17 +92,29 @@ void ODESolve<dep>::set_ics(double x0, dep* y0, double dx0)
 }
 
 template <class dep>
-void ODESolve<dep>::shift_x()
+void ODESolve<dep>::print_state()
 {
-    x_value = x_value + 1e-14;
+    cout << "x = " << x_value << "; dx = " << dx_value << endl;
+    y_values->print();
 }
+
+template <class dep>
+void ODESolve<dep>::print_csv(ostream& os)
+{
+    os.precision(std::numeric_limits<double>::max_digits10 - 1);
+    os << x_value << ", " << dx_value << ", ";
+    y_values->print_csv(os);
+    os << endl;
+}
+
+template <class dep>
+void ODESolve<dep>::f_evaluate(dep* der)
+{  f(x_value, y_values, der);  }
 
 template <class dep>
 void ODESolve<dep>::RKCash_Karp(double x, dep* y, double dx, double* x_stepped, dep* y_5th, dep* y_4th)
 {
-    //int N;
     int N = y->length();
-    //to use k1 - need to delcaire it as an array of N doubles and allocate memory (remember to delete after)
     dep* k1 = new dep(y);
     dep* k2 = new dep(y);
     dep* k3 = new dep(y);
@@ -92,7 +126,8 @@ void ODESolve<dep>::RKCash_Karp(double x, dep* y, double dx, double* x_stepped, 
     dep* z3 = new dep(y);
     dep* z4 = new dep(y);
     dep* z5 = new dep(y);
-    dep* z6 = new dep(y); //inputs to get k2-k6
+    dep* z6 = new dep(y); 
+    
     // k1 = dx * f(x, y)
     f(x, y, k1);
     k1 -> multiply_by(dx);  //k1 = dx * f(x,y)
@@ -175,7 +210,7 @@ void ODESolve<dep>::RKCash_Karp(double x, dep* y, double dx, double* x_stepped, 
 }
 
 template <class dep>
-bool ODESolve<dep>::step_accept(dep* y, dep* y5, dep* y4, double dx, double* dx_new)
+bool ODESolve<dep>::step_accept(dep* y, dep* y5, dep* y4, double dx, double* dx_new, bool error_verbose, bool print_error_file)
 {
     int N = y->length();
 
@@ -189,6 +224,8 @@ bool ODESolve<dep>::step_accept(dep* y, dep* y5, dep* y4, double dx, double* dx_
     { 
         delta1 = abs(y5 -> get_value(i) - y4 -> get_value(i));
         delta0 = eps*(abs(y -> get_value(i)) + abs(y5 -> get_value(i) - y -> get_value(i))) + TINY;
+        
+
         if (delta1/delta0 > dsm)
         { 
             dsm = delta1/delta0;
@@ -196,6 +233,8 @@ bool ODESolve<dep>::step_accept(dep* y, dep* y5, dep* y4, double dx, double* dx_
             
          }
      }
+     
+
     //cout << dsm << ", " << problem << endl;
     //files.precision(std::numeric_limits<double>::max_digits10);
     //files << dsm << ", " << problem << endl;
@@ -218,35 +257,62 @@ bool ODESolve<dep>::step_accept(dep* y, dep* y5, dep* y4, double dx, double* dx_
         //cout<< "FALSE dx_new = " << *dx_new << ", dsm = " << dsm << "; dx = " << dx << endl;
         //cout<< "    i= " << problem << "; y5 = " << y5->get_value(problem) << "; y4 = " << y4->get_value(problem) << endl;
         
+        if (error_verbose)
+            cout << "dsm = " << dsm << ", dx = " << dx << endl << "problem index = " << problem << "; y5 = " << y5->get_value(problem) << "; y4 = " << y4->get_value(problem) << endl;
+            
+        if (print_error_file)
+        {
+            ofstream error_file("ODESolve_ERROR_STEP_ACCEPT.csv");
+            print_csv(error_file);
+            error_file.close();
+            
+            ofstream deriv_error_file("ODESolve_ERROR_fproblem.csv");
+            
+            deriv_error_file.precision(std::numeric_limits<double>::max_digits10 - 1);
+            double x_temp = x_value;
+            dep* y_temp = new dep(y_values);
+            dep* f_temp = new dep(y_values);
+            int N_values = 101;
+            double dx_temp = dx_value / (N_values-1);
+            for (int i = 0; i<N_values; i++)
+            {
+                f(x_temp, y_temp, f_temp);
+                y_temp->add_to(dx_temp, f_temp);
+                deriv_error_file << x_temp << ", " << f_temp->get_value(problem) << ", " << y_temp->get_value(problem) << ", " << f_temp->get_value(problem-1) << ", " << f_temp->get_value(problem+1) << endl;
+                x_temp += dx_temp;
+            }
+            deriv_error_file.close();
+            
+        }
+        total_ODE_rejected_steps++;
         return false;
     }
-    
-    
 }
 
 template <class dep>
 bool ODESolve<dep>::RKCK_step(double x, dep* y, double dx, double* x_next, dep* y_next, double* dx_next)
 {
     double dx_try = dx;
+    double dx_future, x_future;
     int N = y->length();
-    //dep* y5(y);
-    //dep* y4(y);
-    dep* y5 = new dep(y); //???
+    dep* y5 = new dep(y); 
     dep* y4 = new dep(y);
     bool accept = false;
     
-    for (int i = 0; i<10; i++)
-        
+    for (int i = 0; i<10; i++)        
     { 
-        RKCash_Karp(x, y, dx_try, x_next, y5, y4);
-        if (step_accept(y, y5, y4, dx_try, dx_next))
+        RKCash_Karp(x, y, dx_try, &x_future, y5, y4);
+        if (step_accept(y, y5, y4, dx_try, &dx_future))
         {
             y_next -> copy(y5);
+            *dx_next = dx_future;
+            *x_next = x_future;
             accept = true;
             break;
         } 
         else {
-           dx_try = *dx_next; 
+            if (i < 10)
+               dx_try = dx_future; 
         }
         
     }
@@ -255,39 +321,54 @@ bool ODESolve<dep>::RKCK_step(double x, dep* y, double dx, double* x_next, dep* 
     {
         cout << "ERROR:  10 iterations without acceptable step" << endl;
         cout << "x = " << x << "; dx = " << dx_try << endl;
+        
+        dx_try = dx;
+        for (int i =0; i < 10; i++)
+        {
+            cout << "Step " << i << " ";
+            RKCash_Karp(x, y, dx_try, &x_future, y5, y4);
+            if (i < 9)  
+                step_accept(y, y5, y4, dx_try, &dx_future, true, false);
+            else
+                step_accept(y, y5, y4, dx_try, &dx_future, true, false);
+            dx_try = dx_future;
+        }
     }
-
-    
     
     delete y5;
     delete y4;
     
     return accept;
-    
-    
 }
 
 template <class dep>
-bool ODESolve<dep>::ODEOneRun(double x0, dep* y0, double dx0, int N_step, int dN, double x_final, double* x, dep* y, double* dx, const std::string& file_name, bool verbose) 
+bool ODESolve<dep>::RKCK_step_advance()
+{   return RKCK_step(x_value, y_values, dx_value, &x_value, y_values, &dx_value);  }
+
+template <class dep>
+bool ODESolve<dep>::ODEOneRun(int N_step, int dN, double x_final, const std::string& file_name, bool verbose, bool print_csv_file)
 {
-    // Set x, y, dx to initial values
-    int N = y -> length();
-    *x = x0;
-    y -> copy(y0);
-    *dx = dx0;
-
+    int N = y_values->length();
+    
+    // Initial values are (x_value, y_values, dx_value) as set by set_ics
+    
     // Declare for RKCK_step
-    double* x_next = new double; 
-    dep* y_next = new dep(y);
-    double* dx_next = new double;
-
-    bool no_error = true;
+    
+    bool no_error= true;
     bool done = false;
     
-    ofstream file(file_name);  
-
+    if (x_final <= x_value)
+    {
+        cout << "x_final = " << x_final << " is less than initial condition, x_value = " << x_value << endl;
+        return true;
+    }
+    
+    ofstream file;
+    if (print_csv_file)
+        file.open(file_name);
+    
     auto start = high_resolution_clock::now();
-
+    
     if (verbose)
     {
         cout << "*******************" << endl;
@@ -295,61 +376,38 @@ bool ODESolve<dep>::ODEOneRun(double x0, dep* y0, double dx0, int N_step, int dN
         print_state();
         cout << "Output printed to " << file_name << endl;
     }
+
+    if (print_csv_file)
+        print_csv(file);    
     
-    print_csv(file, *x, *dx, y);
-    for (int i = 0; i < N_step && no_error && !done; i++) 
+    for (int i = 0; i < N_step && no_error && !done; i++)
     {
-        for (int j = 0; j < dN; j++) 
+        for(int j = 0; j < dN; j++)
         {
-           // cout << "ith step: " << i << ", jth step: " << j << endl;
-
-            if (*x + *dx > x_final) 
-            {
-                *dx = x_final - *x;
-            }
+            if(x_value + dx_value > x_final)
+                dx_value = x_final - x_value;
             
-            if (RKCK_step(*x, y, *dx, x_next, y_next, dx_next)) 
+            if (!RKCK_step_advance())
             {
-                // Update x, y, dx with the results from the RKCK step
-               // cout << "Before update... x =  " << *x << "and dx = " << *dx << endl;
-              
-                *x = *x_next;
-                y->copy(y_next);
-                *dx = *dx_next;
-               
-               // cout << "After update... x = " << *x << "and dx = " << *dx << endl;
-
-                
-            } 
-            else 
-            {
-                //delete x_next;
-                //delete y_next;
-                //delete dx_next;
-                //file.close();
                 no_error = false;
                 break;
-                //return false;
             }
-
-            if (*x == x_final) 
+            total_ODE_steps++;
+            
+            if (x_value == x_final)
             {
-                cout << "Reached x_final" << endl;
-                print_csv(file, *x, *dx, y); 
-                //delete x_next;
-                //delete y_next;
-                //delete dx_next;
-                //file.close();
+                if(verbose)
+                    cout << "Reached x_final" << endl;
+                if (print_csv_file)
+                    print_csv(file);
                 done = true;
                 break;
-                //return true;
             }
         }
-        if(!done){
-            print_csv(file, *x, *dx, y_next); 
-        }
+        if (!done && print_csv_file)
+            print_csv(file);
     }
-
+    
     auto stop = high_resolution_clock::now();
     auto duration = duration_cast<milliseconds>(stop - start);
 
@@ -358,37 +416,19 @@ bool ODESolve<dep>::ODEOneRun(double x0, dep* y0, double dx0, int N_step, int dN
         print_state();
         cout << endl << "Time elapsed: "
          << duration.count()/1000. << " seconds" << endl;
+        cout << "steps rejected / total steps = " << total_ODE_rejected_steps << " / " << total_ODE_steps << " (" << (100 * total_ODE_rejected_steps) / total_ODE_steps << "%)" << endl;
 
     }
 
-    delete x_next;
-    delete y_next;
-    delete dx_next; 
-    file.close();
-    return true;
+    if(print_csv_file)
+        file.close();
+    return done;
 }
 
 template <class dep>
-void ODESolve<dep>::print_csv(ostream& os, double x, double dx, dep* y)
+bool ODESolve<dep>::run(int N_step, int dN, double x_final, const std::string& file_name, bool verbose)      
 {
-    os.precision(std::numeric_limits<double>::max_digits10 - 1);
-    os << x << ", " << dx << ", ";
-    y_values->print_csv(os);
-    os << endl;
+    return ODEOneRun(N_step, dN, x_final, file_name, verbose, true);
 }
-
-template <class dep>
-void ODESolve<dep>::print_state()
-{
-    cout << "x = " << x_value << ";  dx = " << dx_value << endl;
-    y_values->print();
-}
-
-template <class dep>
-bool ODESolve<dep>::run(int N_step, int dN, double x_final, const std::string& file_name, bool verbose)
-{
-    return ODEOneRun(x_value, y_values, dx_value, N_step, dN, x_final, &x_value, y_values, &dx_value, file_name, verbose);
-}
-
 
 #endif
