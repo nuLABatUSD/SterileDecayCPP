@@ -79,7 +79,6 @@ int main(int argc, char* argv[]){
     string filename = "decay_only-";
     
     cout << "Solving DECAYS-ONLY with m_s = " << ms << " MeV and lifetime " << tau_s << "s from T_cm = " << 1/scales->get_value(0) << " MeV to T_cm = " << 1/scales->get_value(scale_num-1) << " MeV" << endl;
-    return 0;
     
     for (int i = 0; i < scale_num -1; i++)
     {
@@ -90,6 +89,13 @@ int main(int argc, char* argv[]){
     }
     
     cout << "N_eff = " << sim->calc_Neff() << endl;
+    
+    string results_name = folder + "/results.txt";
+    ofstream results(results_name);
+    results << "m_s = " << ms << endl;
+    results << "theta = " << theta << endl;
+    results << "N_eff = " << sim->calc_Neff() << endl;
+    results.close();
   
     delete sim;
     delete input;
