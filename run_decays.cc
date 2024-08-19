@@ -1,4 +1,4 @@
-#include "ODESolve_new.hh"
+#include "ODESolve.hh"
 #include "arrays.hh"
 #include "freqs_ntT.hh"
 #include "decays_only.hh"
@@ -9,6 +9,7 @@
 #include <iostream>
 #include <fstream>
 
+
 using std::cout;
 using std::endl;
 using std::to_string;
@@ -18,18 +19,30 @@ using std::ofstream;
 
 
 
-int main(){
+int main(int argc, char* argv[]){
     /*
     * These four terms and E_low and E_high are constrained in order for our dummy_vars object to function as intended. In particular, we 
     * must obey the inequality scales_num >= floor[log( a_end / a_start ) / log(E_low * (num - 11) / E_high) + 2]
     */
+    if (argc != 4)
+    {
+        cout << "Requires THREE inputs: ms_MeV lifetime_seconds output_folder_name" << endl << "Abort." << endl;
+        return 1;
+    }
+    
+    double ms = std::atof(argv[1]);
+    double tau_s = std::atof(argv[2]);
+    string folder = std::string(argv[3]);
+    
+    double theta = 1.e-6 * sqrt(get_lifetime(ms, 1.e-6)*_hbar_/tau_s);
+
     double a_start = 0.1;
     double a_end = 10.00;
     int num = 51;
     int scale_num = 9;
     
-    double ms = 300;
-    double theta = 1.22e-5;
+   // double ms = 300;
+   // double theta = 1.22e-5;
     double time = 0;
     double temp = 1 / a_start;
 
@@ -63,8 +76,10 @@ int main(){
     
     sim->set_ics(a_start, input, 0.01 * a_start);
     
-    string folder = "Run5";
     string filename = "decay_only-";
+    
+    cout << "Solving DECAYS-ONLY with m_s = " << ms << " MeV and lifetime " << tau_s << "s from T_cm = " << 1/scales->get_value(0) << " MeV to T_cm = " << 1/scales->get_value(scale_num-1) << " MeV" << endl;
+    return 0;
     
     for (int i = 0; i < scale_num -1; i++)
     {

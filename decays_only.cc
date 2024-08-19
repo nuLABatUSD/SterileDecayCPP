@@ -1,4 +1,4 @@
-#include "ODESolve_new.hh"
+#include "ODESolve.hh"
 #include "arrays.hh"
 #include "freqs_ntT.hh"
 #include "decays_only.hh"
@@ -187,7 +187,6 @@ bool derivatives::inch_forward(double a0, double a1, string& folder_name, string
     dummy_vars* a_separations = retrieve_separations();
     dx_value *= 0.01;
     
-    cout << a_separations->get_value(0) << " " << a_separations->get_value(a_separations->get_len()-1) << endl;
     
     string data_file_name = folder_name + "/data-" + file_name + ".csv";
     string eps_file_name = folder_name + "/eps-" + file_name + ".csv";
@@ -248,6 +247,6 @@ bool derivatives::inch_forward(double a0, double a1, string& folder_name, string
 double derivatives::calc_Neff()
 {
     double nu_dens = y_values->get_neutrino_density(x_value);
-    return nu_dens;// * pow(y_values->get_temp(), -4) * (4./7.) * pow(11./4., 4./3.) * 30. / _PI_ / _PI_;
+    return nu_dens * pow(y_values->get_temp(), -4) * (4./7.) * pow(11./4., 4./3.) * 30. / _PI_ / _PI_;
 
 }

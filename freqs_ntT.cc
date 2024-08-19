@@ -44,7 +44,8 @@ freqs_ntT::freqs_ntT(freqs_ntT* copy_me):dep_vars(6 * copy_me->get_num_bins() + 
     a_end = copy_me->get_a_end();
     sterile_mass = copy_me->get_ms();
     mixing_angle = copy_me->get_theta();
-    eps = new gel_linspace_gl(E_low * a_start, E_high * a_end, num_bins);
+    eps = new gel_linspace_gl(copy_me->get_eps());
+//    eps = new gel_linspace_gl(E_low * a_start, E_high * a_end, num_bins);
 
     for(int i = 0; i < 6 * num_bins + 3; i++){
         values[i] = copy_me->get_value(i);
@@ -65,16 +66,39 @@ void freqs_ntT::eps_shift(double new_a_start, double new_a_end){
     for(int i = 0; i < 6 * num_bins; i++){
         freqs_ntT[i] = values[i];
     }
+    
+    int index_gl_begin = eps->get_len() - eps->get_gl();
+    
     for(int p = 0; p < 6; p++){
         for(int k = 0; k < num_bins; k++){
             if(new_eps->get_value(k) < eps->get_value(num_bins - 1)){
                 double new_val = 0;
                 double new_x_val = new_eps->get_value(k);
                 int key_id = 0;
+                
                 while(eps->get_value(key_id) <= new_x_val){
                     key_id++;
                 }
+                
+                switch(key_id-index_gl_begin)
+                {
+                    case 0:
+                        key_id += 2;
+                        break;
+                    case 1:
+                        key_id++;
+                        break;
+                    case -1:
+                        key_id -= 2;
+                        break;
+                    case -2:
+                        key_id--;
+                        break;
+                }
                 int ids[4] = {p * num_bins + key_id - 2, p * num_bins + key_id - 1, p * num_bins + key_id, p * num_bins + key_id + 1};
+                
+                
+                
                 if(key_id + 1 >= num_bins){
                     ids[3] = p * num_bins + key_id - 3;
                 }
@@ -84,6 +108,9 @@ void freqs_ntT::eps_shift(double new_a_start, double new_a_end){
                         ids[1] = p * num_bins + key_id + 3;
                     }
                 }
+                
+                
+                bool set_zero = false;
                 for(int i = 0; i < 4; i++){
                     
                     double multiplier = 1;
@@ -97,22 +124,36 @@ void freqs_ntT::eps_shift(double new_a_start, double new_a_end){
                             multiplier *= (new_x_val - mult_x) / (old_x_val - mult_x);
                         }
                     }
-                    new_val += multiplier * log10(old_val);
+                    if (old_val > 0)
+                        new_val += multiplier * log10(old_val);
+                    else
+                        set_zero = true;
                 }
-                values[p * num_bins + k] = pow(10, new_val);
+                if (set_zero)
+                    values[p*num_bins + k] = 0;
+                else
+                    values[p * num_bins + k] = pow(10, new_val);
+                
+                //if(std::isinf(values[p*num_bin+k]))
+                  //  cout << ""
             } else {
                 double old_eps1 = eps->get_value(num_bins - 2);
                 double old_f1 = freqs_ntT[(p + 1) * num_bins - 2];
                 double old_eps2 = eps->get_value(num_bins - 1);
                 double old_f2 = freqs_ntT[(p + 1) * num_bins - 1];
-
-                double logy = ((new_eps->get_value(k) - old_eps1) * (log(old_f2) - log(old_f1)) / (old_eps2 - old_eps1)) + log(old_f1);
-                values[p * num_bins + k] = exp(logy);
+                
+                if (old_f1 == 0 || old_f2 == 0)
+                    values[p*num_bins + k] = 0;
+                else
+                {
+                    double logy = ((new_eps->get_value(k) - old_eps1) * (log(old_f2) - log(old_f1)) / (old_eps2 - old_eps1)) + log(old_f1);
+                    values[p * num_bins + k] = exp(logy);
+                }
             }
         }
     }
-    eps = new gel_linspace_gl(E_low * new_a_start, E_high * a_end, num_bins);
-    delete new_eps;
+    delete eps;
+    eps = new_eps;
     delete[] freqs_ntT;
 }
 
@@ -2159,4 +2200,5 @@ double nu_e_collision_R2::whole_integral(freqs_ntT* input, double a, double chec
             results[i] *= pow(temp_cm, 5) / (pow(2,4) * pow(2*_PI_,3) * pow(p1_energy,2));
         }
     }
+    return 0;
 }

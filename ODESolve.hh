@@ -254,6 +254,7 @@ bool ODESolve<dep>::step_accept(dep* y, dep* y5, dep* y4, double dx, double* dx_
     }
     else{
         *dx_new = Safety * dx * pow(dsm, -0.25);
+        *dx_new = std::min(0.5 * dx, *dx_new);
         //cout<< "FALSE dx_new = " << *dx_new << ", dsm = " << dsm << "; dx = " << dx << endl;
         //cout<< "    i= " << problem << "; y5 = " << y5->get_value(problem) << "; y4 = " << y4->get_value(problem) << endl;
         
@@ -330,7 +331,7 @@ bool ODESolve<dep>::RKCK_step(double x, dep* y, double dx, double* x_next, dep* 
             if (i < 9)  
                 step_accept(y, y5, y4, dx_try, &dx_future, true, false);
             else
-                step_accept(y, y5, y4, dx_try, &dx_future, true, false);
+                step_accept(y, y5, y4, dx_try, &dx_future, true, true);
             dx_try = dx_future;
         }
     }

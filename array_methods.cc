@@ -330,32 +330,85 @@ double linspace_and_gl::get_max_linspace(){
     
 }
 
-gel_linspace_gl::gel_linspace_gl(double min_lin, double max_lin, int num):dummy_vars(num)
+gel_linspace_gl::gel_linspace_gl(double lin_sm, double max_lin, int num):dummy_vars(num)
 {
-    num_gel = 10;
-    num_lin = num - 15;
-    num_gl = 5;
-    double dx_val = (max_lin - min_lin) / (num_lin - 2);
-    double E_low = int(min_lin / dx_val) * dx_val;
-    double E_high = (int(max_lin / dx_val) + 1) * dx_val;
-    double total_length = num_gel + num_lin + num_gl;
-    for(int i = 0; i < total_length; i++){
-        if(i < num_gel){
-            values[i] = (E_low * gel_vals_10[i] + E_low) / 2;
-            weights[i] = gel_weights_10[i] * (E_low / 2);
-        } else if(i < num_gel + num_lin){
-            values[i] = E_low + dx_val * (i - num_gel);
-            if(i == num_gel || i == num_gel + num_lin - 1){
-                weights[i] = dx_val / 2;
-            } else {
-                weights[i] = dx_val;
-            }
-        } else {
-            values[i] = xvals_5[i - num_gel - num_lin] + E_high;
-            weights[i] = wvals_5[i - num_gel - num_lin] * exp(xvals_5[i - num_gel - num_lin]);
+    num_gel = default_N_gel;
+    num_gl = default_N_gl;
+    num_lin = num - num_gel - num_gl;
+    
+    double min_lin, dx_val, E_low, E_high;
+    int N_LS;
+    
+    
+    dummy_vars* ls_dv;
+    if (lin_sm < max_lin_sm)
+    {
+        N_LS = num_lin - 2;
+        min_lin = lin_sm;
+        
+        dx_val = (max_lin - min_lin) / N_LS;
+        E_low = int(min_lin / dx_val) * dx_val;
+        E_high = (int(max_lin / dx_val) + 1) * dx_val;    
+
+    }
+    else
+    {
+        N_LS = num_lin - 3;
+        min_lin = lin_sm;
+        
+        dx_val = (max_lin - min_lin) / N_LS;
+        E_low = int(min_lin / dx_val) * dx_val;
+        E_high = (int(max_lin / dx_val) + 1) * dx_val;
+                
+        if (E_low < max_lin_sm)
+        {
+            N_LS = num_lin - 2;
+            min_lin = lin_sm;
+            
+            dx_val = (max_lin - min_lin) / N_LS;
+            E_low = int(min_lin / dx_val) * dx_val;
+            E_high = (int(max_lin / dx_val) + 1) * dx_val;
+            
         }
 
     }
+    
+    
+    linspace_for_trap* linspace_part = new linspace_for_trap(E_low, E_high, N_LS+2);
+    
+    if (N_LS+2 == num_lin)
+        ls_dv = linspace_part;
+    else
+    {
+        ls_dv = new dummy_vars(num_lin);
+        ls_dv->set_value(0, max_lin_sm);
+        for (int i = 1; i < num_lin; i++)
+            ls_dv->set_value(i, linspace_part->get_value(i-1));
+        ls_dv->set_trap_weights();
+        E_low = max_lin_sm;
+    }
+
+    for(int i = 0; i < num_gel; i++)
+    { //need to change E_low
+        values[i] = (E_low * gel_vals_10[i] + E_low) / 2;
+        weights[i] = gel_weights_10[i] * (E_low / 2);
+    }
+    for(int i = num_gel; i < num_gel + num_lin; i++)
+    {
+        values[i] = ls_dv->get_value(i - num_gel);
+        weights[i] = ls_dv->get_weight(i - num_gel);
+    }
+    
+    delete ls_dv;
+    
+    for(int i = num_gel + num_lin; i < num; i++)
+    {
+        values[i] = xvals_5[i - num_gel - num_lin] + E_high;
+        weights[i] = wvals_5[i - num_gel - num_lin] * exp(xvals_5[i - num_gel - num_lin]);
+    }
+    
+
+    
 }
 
 gel_linspace_gl::gel_linspace_gl(gel_linspace_gl* copy_me):dummy_vars(copy_me->N)
