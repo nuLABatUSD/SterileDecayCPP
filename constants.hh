@@ -16,3 +16,4 @@ const double _pion_decay_ = 131;
 const double _gwd_ = 10.75;
 const double _gsdec_ = 61.75;
 const double _zeta_3_ = 1.2020569031595942853;
+const double _tolerance_ = 30;

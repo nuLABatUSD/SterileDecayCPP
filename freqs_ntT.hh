@@ -17,6 +17,7 @@ class freqs_ntT : public dep_vars
     public:
 
     freqs_ntT(int, double, double, double, double, double, double, dummy_vars*, double, double, double);
+    freqs_ntT(gel_linspace_gl*);
     freqs_ntT(freqs_ntT*);
     ~freqs_ntT();
 
@@ -72,20 +73,20 @@ class integration
     double*** Fvv_values;
     double*** Fvvbar_values;
 
-    double temp_cm;
-    double me_scaled;
-    dummy_vars* p2_vals;
-
 
     public:
     integration(gel_linspace_gl*, int);
     integration(integration*);
     ~integration();
     dummy_vars** get_p3();
-    double Fvv_comp(freqs_ntT*, bool, int, int, int, double);
-    void populate_Fvv(freqs_ntT*, double);
-    double Fvvbar_comp(freqs_ntT*, bool, int, int, int, double);
-    void populate_Fvvbar(freqs_ntT*, double);
+    double Fvv_comp(freqs_ntT*, bool, int, int, int, int);
+    void populate_Fvv(freqs_ntT*, int);
+    double Fvvbar_comp(freqs_ntT*, bool, int, int, int, int);
+    void populate_Fvvbar(freqs_ntT*, int);
+    double Fvv_comp_eq(bool, int, int, int, int);
+    void populate_Fvv_eq(int);
+    double Fvvbar_comp_eq(bool, int, int, int, int);
+    void populate_Fvvbar_eq(int);
     double J1(double, double, double);
     double J2(double, double);
     double J3(double, double, double);
@@ -94,7 +95,8 @@ class integration
     double K3(double, double, double);
     
     double interior_integral(int, int);
-    void whole_integral(freqs_ntT*, double, double, double*);
+    void whole_integral(freqs_ntT*, double, int, double*);
+    void whole_integral_eq(double, int, double*);
 };
 
 class nu_e_collision_R1
@@ -114,18 +116,21 @@ class nu_e_collision_R1
     double*** F_values;
     
     public:
-    nu_e_collision_R1(gel_linspace_gl*, int, double);
+    nu_e_collision_R1(gel_linspace_gl*, int, double, bool);
     ~nu_e_collision_R1();
 
-    double get_temp_cm();
+    void nullify_electron();
     dummy_vars** get_q3();
     double M1_R1(double, double, int);
     double M2_R1(double, double, int);
     double F_comp(freqs_ntT*, int, int, int, int);
     void populate_F(freqs_ntT*, int);
+    double F_comp_eq(freqs_ntT*, int, int, int, int);
+    void populate_F_eq(freqs_ntT*, int);
     void print_F(int);
     double interior_integral_R1(int, int);
-    void whole_integral(freqs_ntT*, double, double*);
+    void whole_integral(freqs_ntT*, int, double*);
+    void whole_integral_eq(freqs_ntT*, int, double*);
     
 };
 
@@ -155,9 +160,14 @@ class nu_e_collision_R2
     
     
     public:
-    nu_e_collision_R2(gel_linspace_gl*, int, double);
+    nu_e_collision_R2(gel_linspace_gl*, int, double, bool);
+    ~nu_e_collision_R2();
+
+    void nullify_electron();
     double F_comp(freqs_ntT*, int, int, int, int);
     void populate_F(freqs_ntT*, int);
+    double F_comp_eq(freqs_ntT*, int, int, int, int);
+    void populate_F_eq(freqs_ntT*, int);
     double integrated_M_1_prime(double, double, int);
     double M_1_1(double, double, double, int);
     double M_1_2(double, double, int);
@@ -169,8 +179,10 @@ class nu_e_collision_R2
     double M_2_3(double, double, double, double, int);
     double M_2_4(double, double, double, double, int);
     double inner_integral(int, int);
-    double whole_integral(freqs_ntT*, double, double, double*);
+    double whole_integral(freqs_ntT*, int, double*);
+    double whole_integral_eq(freqs_ntT*, int, double*);
     
-    ~nu_e_collision_R2();
+    
 };
+
 #endif

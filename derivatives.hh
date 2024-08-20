@@ -5,13 +5,14 @@
 class derivatives : public ODESolve<freqs_ntT>
 {
 private:
-    double num_bins;
+    int num_bins;
     double E_low;
     double E_high;
     double a_start;
     double a_end;
     double sterile_mass;
     double mixing_angle;
+    double*** Rvi;
 
 public:
     derivatives(int, double, double, double, double, double, double, dummy_vars*, double, double, double);

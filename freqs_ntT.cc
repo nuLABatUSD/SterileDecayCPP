@@ -36,6 +36,24 @@ freqs_ntT::freqs_ntT(int num, double low, double high, double start, double end,
     values[6 * num + 2] = temp;
 }
 
+freqs_ntT::freqs_ntT(gel_linspace_gl* e):dep_vars(6 * e->get_len() + 3)
+{   
+    num_bins = e->get_len();
+    eps = new gel_linspace_gl(e);
+
+    for(int i = 0; i < num_bins; i++){
+        double freq = 1 / (exp(eps->get_value(i)) + 1);
+        values[i] = freq;
+        values[i + num_bins] = freq;
+        values[i + 2 * num_bins] = freq;
+        values[i + 3 * num_bins] = freq;
+        values[i + 4 * num_bins] = freq;
+        values[i + 5 * num_bins] = freq;
+    }
+    // set at 100 MeV to check case of massless electron
+    values[6 * num_bins + 2] = 100;
+}
+
 freqs_ntT::freqs_ntT(freqs_ntT* copy_me):dep_vars(6 * copy_me->get_num_bins() + 3){
     num_bins = copy_me->get_num_bins();
     E_low = copy_me->get_low();
@@ -615,17 +633,18 @@ integration::~integration(){
         delete[] Fvv_values[i];
         delete[] Fvvbar_values[i];
     }
+    
     delete[] Fvv_values;
     delete[] Fvvbar_values;
     delete eps;
-
+    
 }
 
 dummy_vars** integration::get_p3(){
     return p3_vals;
 }
 
-double integration::Fvv_comp(freqs_ntT* input, bool neutrino, int which_term, int p2, int p3, double check){
+double integration::Fvv_comp(freqs_ntT* input, bool neutrino, int which_term, int p2, int p3, int check){
     double F = 0;
     double p1_energy = eps->get_value(p1);
     double p2_energy = eps->get_value(p2);
@@ -700,12 +719,12 @@ double integration::Fvv_comp(freqs_ntT* input, bool neutrino, int which_term, in
         if(eps->get_value(num - 1) >= p4_energy){
             int p4 = 0;
             for(int j = 0; j < num; j++){
-                if(eps->get_value(j) <= p4_energy){
+                if(eps->get_value(j) < p4_energy){
                     p4++;
                 }
             }
 
-            int ids[4] = {k_mod* num + p4 - 2, k_mod* num + p4 - 1, k_mod* num + p4, k_mod* num + p4 + 1};
+            int ids[4] = {k_mod * num + p4 - 2, k_mod * num + p4 - 1, k_mod * num + p4, k_mod * num + p4 + 1};
             if(p4 + 1 >= num){
                 ids[3] = k_mod* num + p4 - 3;
             }
@@ -730,22 +749,21 @@ double integration::Fvv_comp(freqs_ntT* input, bool neutrino, int which_term, in
                 }
                 f4 += multiplier * log10(old_val);
             }
-            f4 = pow(10, f4);  
+            f4 = pow(10, f4);
         } else {
             double old_eps1 = eps->get_value(num - 2);
-            double old_f1 = input->get_value((k_mod+ 1) * num - 2);
+            double old_f1 = input->get_value((k_mod + 1) * num - 2);
             double old_eps2 = eps->get_value(num - 1);
-            double old_f2 = input->get_value((k_mod+ 1) * num - 1);
-
+            double old_f2 = input->get_value((k_mod + 1) * num - 1);
             double logy = ((p4_energy - old_eps1) * (log(old_f2) - log(old_f1)) / (old_eps2 - old_eps1)) + log(old_f1);
             f4 = exp(logy);
         }
-        F += s_mod * (abs(check - 1) * f3 * f4 * (1 - f1) * (1 - f2) - check * f1 * f2 * (1 - f3) * (1 - f4));
+        F += s_mod * (abs(check - 1) * f3 * f4 * (1 - f1) * (1 - f2) + check * f1 * f2 * (1 - f3) * (1 - f4)); // + since check of 1 used to call F-
     }
     return F;
 }
 
-void integration::populate_Fvv(freqs_ntT* input, double check){
+void integration::populate_Fvv(freqs_ntT* input, int check){
     int num = eps->get_len();
     for(int i = 0; i < num; i++){
         int num3 = p3_vals[i]->get_len();
@@ -765,7 +783,7 @@ void integration::populate_Fvv(freqs_ntT* input, double check){
     }
 }
 
-double integration::Fvvbar_comp(freqs_ntT* input, bool neutrino, int which_term, int p2, int p3, double check){
+double integration::Fvvbar_comp(freqs_ntT* input, bool neutrino, int which_term, int p2, int p3, int check){
     double F = 0;
     double p1_energy = eps->get_value(p1);
     double p2_energy = eps->get_value(p2);
@@ -907,14 +925,14 @@ double integration::Fvvbar_comp(freqs_ntT* input, bool neutrino, int which_term,
                     double logy = ((p4_energy - old_eps1) * (log(old_f2) - log(old_f1)) / (old_eps2 - old_eps1)) + log(old_f1);
                     f4 = exp(logy);
                 }
-                F += s_mod * (abs(check - 1) * f3 * f4 * (1 - f1) * (1 - f2) - check * f1 * f2 * (1 - f3) * (1 - f4));
+                F += s_mod * (abs(check - 1) * f3 * f4 * (1 - f1) * (1 - f2) + check * f1 * f2 * (1 - f3) * (1 - f4)); // + since check of 1 used to call F-
             }
         }
     }
     return F;
 }
 
-void integration::populate_Fvvbar(freqs_ntT* input, double check){
+void integration::populate_Fvvbar(freqs_ntT* input, int check){
     int num = eps->get_len();
     for(int i = 0; i < num; i++){
         int num3 = p3_vals[i]->get_len();
@@ -926,6 +944,119 @@ void integration::populate_Fvvbar(freqs_ntT* input, double check){
                 }
                 if(j < num3){
                     Fvvbar_values[k][i][j] = Fvvbar_comp(input, neutrino, k, i, j, check) / 4;
+                } else {
+                    Fvvbar_values[k][i][j] = 0;
+                }
+            }
+        }
+    }
+}
+
+double integration::Fvv_comp_eq(bool neutrino, int which_term, int p2, int p3, int check){
+    double F = 0;
+    double p1_energy = eps->get_value(p1);
+    double p2_energy = eps->get_value(p2);
+    double p3_energy = p3_vals[p2]->get_value(p3);
+    double p4_energy = p1_energy + p2_energy - p3_energy;
+    int k_mod = 0;
+
+    double f1 = 1 / (exp(p1_energy) + 1);
+    double f2 = 1 / (exp(p2_energy) + 1);
+    double f3 = 1 / (exp(p3_energy) + 1);
+    double f4 = 1 / (exp(p4_energy) + 1);
+    for(int k = 0; k < 3; k++){
+        if(neutrino){
+            k_mod = 2 * k;
+        } else {
+            k_mod = 2 * k + 1;
+        }
+        double s_mod = 1.;
+        if(k_mod != which_term){
+            s_mod = 1./2;
+        }
+        F += s_mod * (abs(check - 1) * f3 * f4 * (1 - f1) * (1 - f2) + check * f1 * f2 * (1 - f3) * (1 - f4)); // + since check of 1 used to call F-
+    }
+    return F;
+}
+
+void integration::populate_Fvv_eq(int check){
+    int num = eps->get_len();
+    for(int i = 0; i < num; i++){
+        int num3 = p3_vals[i]->get_len();
+        for(int j = 0; j < num + 1; j++){
+            for(int k = 0; k < 6; k++){
+                bool neutrino = false;
+                if(k % 2 == 0){
+                    neutrino = true;
+                }
+                if(j < num3){
+                    Fvv_values[k][i][j] = Fvv_comp_eq(neutrino, k, i, j, check);
+                } else {
+                    Fvv_values[k][i][j] = 0;
+                }
+            }
+        }
+    }
+}
+
+double integration::Fvvbar_comp_eq(bool neutrino, int which_term, int p2, int p3, int check){
+    double F = 0;
+    double p1_energy = eps->get_value(p1);
+    double p2_energy = eps->get_value(p2);
+    double p3_energy = p3_vals[p2]->get_value(p3);
+    double p4_energy = p1_energy + p2_energy - p3_energy;
+
+    double f1 = 1 / (exp(p1_energy) + 1);
+    double f2 = 1 / (exp(p2_energy) + 1);
+    double f3 = 1 / (exp(p3_energy) + 1);
+    double f4 = 1 / (exp(p4_energy) + 1);
+
+    int v1;
+    int v2;
+    int v4;
+    int term = which_term / 2;
+    if(neutrino){
+        v1 = which_term;
+    } else {
+        v2 = which_term;
+    }
+    for(int i = 0; i < 3; i++){
+        for(int j = 0; j < 3; j++){
+            if(i == term || i == j){
+                double s_mod = 1;
+                if(neutrino){
+                    v2 = 2 * i + 1;
+                } else {
+                    v1 = 2 * i;
+                }
+
+                if(v2 == v1 + 1){
+                    v4 = 2 * j;
+                    if(v1 != v4){
+                        s_mod = 1./4;
+                    }
+                } else {
+                    s_mod = 1./4;
+                }
+                F += s_mod * (abs(check - 1) * f3 * f4 * (1 - f1) * (1 - f2) + check * f1 * f2 * (1 - f3) * (1 - f4)); // + since check of 1 used to call F-
+            }
+        }
+    }
+    return F;
+}
+
+void integration::populate_Fvvbar_eq(int check){
+    int num = eps->get_len();
+    for(int i = 0; i < num; i++){
+        int num3 = p3_vals[i]->get_len();
+        for(int j = 0; j < num + 1; j++){
+            for(int k = 0; k < 6; k++){
+                bool neutrino = false;
+                if(k % 2 == 0){
+                    neutrino = true;
+                }
+                if(j < num3){
+                    Fvvbar_values[k][i][j] = Fvvbar_comp_eq(neutrino, k, i, j, check) / 4;
                 } else {
                     Fvvbar_values[k][i][j] = 0;
                 }
@@ -1002,7 +1133,7 @@ double integration::interior_integral(int p2, int which_term){
     return result;
 }
 
-void integration::whole_integral(freqs_ntT* input, double a, double check, double* results){
+void integration::whole_integral(freqs_ntT* input, double a, int check, double* results){
     double p_1_energy = eps->get_value(p1);
     if (p_1_energy == 0){
         for(int i=0; i<6; i++){
@@ -1014,6 +1145,28 @@ void integration::whole_integral(freqs_ntT* input, double a, double check, doubl
         this->populate_Fvv(input, check);
         this->populate_Fvvbar(input, check);
         double Tcm = 1 / a;
+        for(int i=0; i<6; i++){
+            for(int p2=0; p2<eps->get_len(); p2++){
+                outer_vals->set_value(p2, interior_integral(p2, i));
+            }
+            results[i] = eps->integrate(outer_vals);
+            results[i] *= pow(Tcm, 5) * pow(_GF_,2) / (pow(2*_PI_,3) * pow(p_1_energy,2));
+        }
+    }
+}
+
+void integration::whole_integral_eq(double a, int check, double* results){
+    double p_1_energy = eps->get_value(p1);
+    if (p_1_energy == 0){
+        for(int i=0; i<6; i++){
+            results[i] = 0;
+        }
+    }
+    else{
+        //populates F_values
+        this->populate_Fvv_eq(check);
+        this->populate_Fvvbar_eq(check);
+        double Tcm = 1. / a;
         
         for(int i=0; i<6; i++){
             for(int p2=0; p2<eps->get_len(); p2++){
@@ -1026,11 +1179,15 @@ void integration::whole_integral(freqs_ntT* input, double a, double check, doubl
 }
 
 // nu_e_collision_R1 to take care of neutrino-electron R1 collision integrals
-
-nu_e_collision_R1::nu_e_collision_R1(gel_linspace_gl* e, int p1_idx, double a){
+// early p1 values appear fundamentally limited in precision. Adding more points only changes which values are imprecise, 
+// but the 0 index will always be a rough estimation of collision integral.
+nu_e_collision_R1::nu_e_collision_R1(gel_linspace_gl* e, int p1_idx, double a, bool equilibrium){
     eps = new gel_linspace_gl(e);
     p1 = p1_idx;
-    temp_cm = 1 / a;
+    temp_cm = 1./a;
+    if(equilibrium){
+        temp_cm = 100;
+    }
     me_scaled = _electron_mass_ / temp_cm;
     count = 0;
 
@@ -1106,13 +1263,34 @@ nu_e_collision_R1::nu_e_collision_R1(gel_linspace_gl* e, int p1_idx, double a){
     for(int i=0; i<6; i++){
         F_values[i] = new double*[size];
         for(int j = 0; j < size; j++){
-            F_values[i][j] = new double[eps->get_len() + 1](); 
+            F_values[i][j] = new double[eps->get_len() + 2](); 
         }
     }    
 }
 
-double nu_e_collision_R1::get_temp_cm(){
-    return temp_cm;
+void nu_e_collision_R1::nullify_electron(){
+    me_scaled = 0;
+}
+
+nu_e_collision_R1::~nu_e_collision_R1(){
+    for(int i=0; i<6; i++){
+        for(int j=0; j<q2_vals->get_len(); j++){
+            delete[] F_values[i][j];
+        }
+        delete[] F_values[i];
+    }
+    delete[] F_values;
+    
+    for(int i=0; i<q2_vals->get_len(); i++){
+        delete q3_vals[i];
+        delete inner_vals[i];
+    }
+    delete q3_vals;
+    delete inner_vals;
+    
+    delete outer_vals;
+    delete q2_vals;
+    delete eps; 
 }
 
 dummy_vars** nu_e_collision_R1::get_q3(){
@@ -1174,9 +1352,13 @@ double nu_e_collision_R1::F_comp(freqs_ntT* input, int which_term, int q2, int q
     double p4_energy = p1_energy + E2 - E3;
 
     int num = eps->get_len();
+    int modifier = 1;
+    if(me_scaled == 0){
+        modifier = 0;
+    }
     double f1 = input->get_value(which_term * num + p1);
-    double f2 = 1 / (exp(E2 * temp_cm / input->get_temp()) + 1);
-    double f3 = 1 / (exp(E3 * temp_cm / input->get_temp()) + 1);
+    double f2 = 1 / (exp(E2 * modifier * temp_cm / input->get_temp()) + 1);
+    double f3 = 1 / (exp(E3 * modifier * temp_cm / input->get_temp()) + 1);
     double f4 = 0;
     if(q3 != 0 && q3 != q3_vals[q2]->get_len() - 1){
         f4 = input->get_value(which_term * num + p4_highs[q2] - q3 + 1);
@@ -1228,7 +1410,7 @@ double nu_e_collision_R1::F_comp(freqs_ntT* input, int which_term, int q2, int q
             f4 = exp(logy);
         }
     }
-    return ((check + 1) * f3 * f4 * (1 - f1) * (1 - f2) - check * f1 * f2 * (1 - f3) * (1 - f4));
+    return (abs(check - 1) * f3 * f4 * (1 - f1) * (1 - f2) + check * f1 * f2 * (1 - f3) * (1 - f4)); // + since check of 1 used to call F-
 }
 
 void nu_e_collision_R1::populate_F(freqs_ntT* input, int check){
@@ -1236,10 +1418,43 @@ void nu_e_collision_R1::populate_F(freqs_ntT* input, int check){
     int size = q2_vals->get_len();
     for(int i = 0; i < size; i++){
         int num3 = q3_vals[i]->get_len();
-        for(int j = 0; j < num + 1; j++){
+        for(int j = 0; j < num + 2; j++){
             for(int k = 0; k < 6; k++){
                 if(j < num3){
                     F_values[k][i][j] = F_comp(input, k, i, j, check);
+                } else {
+                    F_values[k][i][j] = 0;
+                }
+            }
+        }
+    }
+}
+
+double nu_e_collision_R1::F_comp_eq(freqs_ntT* input, int which_term, int q2, int q3, int check){
+    double p1_energy = eps->get_value(p1);
+    double q2_energy = q2_vals->get_value(q2);
+    double E2 = sqrt(pow(q2_energy, 2) + pow(me_scaled, 2));
+    double q3_energy = q3_vals[q2]->get_value(q3);
+    double E3 = sqrt(pow(q3_energy, 2) + pow(me_scaled, 2));
+    double p4_energy = p1_energy + E2 - E3;
+
+    double f1 = 1 / (exp(p1_energy) + 1);
+    double f2 = 1 / (exp(E2 * temp_cm / input->get_temp()) + 1);
+    double f3 = 1 / (exp(E3 * temp_cm / input->get_temp()) + 1);
+    double f4 = 1 / (exp(p4_energy) + 1);
+    
+    return (abs(check - 1) * f3 * f4 * (1 - f1) * (1 - f2) + check * f1 * f2 * (1 - f3) * (1 - f4)); // + since check of 1 used to call F-
+}
+
+void nu_e_collision_R1::populate_F_eq(freqs_ntT* input, int check){
+    int num = eps->get_len();
+    int size = q2_vals->get_len();
+    for(int i = 0; i < size; i++){
+        int num3 = q3_vals[i]->get_len();
+        for(int j = 0; j < num + 1; j++){
+            for(int k = 0; k < 6; k++){
+                if(j < num3){
+                    F_values[k][i][j] = F_comp_eq(input, k, i, j, check);
                 } else {
                     F_values[k][i][j] = 0;
                 }
@@ -1399,7 +1614,7 @@ double nu_e_collision_R1::interior_integral_R1(int q2, int which_term){
     return q3_vals[q2]->integrate(inner_vals[q2]);
 }
 
-void nu_e_collision_R1::whole_integral(freqs_ntT* input, double check, double* results){
+void nu_e_collision_R1::whole_integral(freqs_ntT* input, int check, double* results){
     //populates F_values
     this->populate_F(input, check);
     double p_1_energy = eps->get_value(p1);
@@ -1414,10 +1629,31 @@ void nu_e_collision_R1::whole_integral(freqs_ntT* input, double check, double* r
     }
 }
 
+void nu_e_collision_R1::whole_integral_eq(freqs_ntT* input, int check, double* results){
+    //populates F_values
+    this->populate_F_eq(input, check);
+    double p_1_energy = eps->get_value(p1);
+    for(int i=0; i<6; i++){
+        for(int q2=0; q2<q2_vals->get_len(); q2++){
+            double q2_energy = q2_vals->get_value(q2);
+            double E2 = sqrt(pow(q2_energy, 2) + pow(me_scaled, 2));
+            outer_vals->set_value(q2, (q2_energy / E2) * interior_integral_R1(q2, i));
+        }
+        results[i] = q2_vals->integrate(outer_vals);
+        results[i] *= pow(temp_cm, 5) / (pow(2, 4) * pow(2 * _PI_, 3) * pow(p_1_energy, 2));
+    }
+}
+
 // nu_e_collision_R2 to take care of neutrino-electron R2 collision integrals
-nu_e_collision_R2::nu_e_collision_R2(gel_linspace_gl* e, int p1_index, double a){
+// early p1 values appear fundamentally limited in precision. Adding more points only changes which values are imprecise, 
+// but the 0 index will always be a rough estimation of collision integral.
+nu_e_collision_R2::nu_e_collision_R2(gel_linspace_gl* e, int p1_index, double a, bool equilibrium){
     scaled_me = _electron_mass_ * a;
     temp_cm = 1./a;
+    if(equilibrium){
+        temp_cm = 100;
+        scaled_me = _electron_mass_ / 100;
+    }
     eps = new gel_linspace_gl(e);
     p1 = p1_index;
     p1_energy = eps->get_value(p1);
@@ -1630,6 +1866,10 @@ nu_e_collision_R2::~nu_e_collision_R2(){
     delete q_lim_1;   
 }
 
+void nu_e_collision_R2::nullify_electron(){
+    scaled_me = 0;
+}
+
 double nu_e_collision_R2::F_comp(freqs_ntT* input, int which_term, int q2, int q3, int check){
     double p1_energy = eps->get_value(p1);
     double q3_energy = q3_vals->get_value(q3);
@@ -1639,9 +1879,13 @@ double nu_e_collision_R2::F_comp(freqs_ntT* input, int which_term, int q2, int q
     double p4_energy = p1_energy + E2 - E3;
 
     int num = eps->get_len();
+    int modifier = 1;
+    if(scaled_me == 0){
+        modifier = 0;
+    }
     double f1 = input->get_value(which_term * num + p1);
-    double f2 = 1 / (exp(E2 * temp_cm / input->get_temp()) + 1);
-    double f3 = 1 / (exp(E3 * temp_cm / input->get_temp()) + 1);
+    double f2 = 1 / (exp(E2 * modifier * temp_cm / input->get_temp()) + 1);
+    double f3 = 1 / (exp(E3 * modifier * temp_cm / input->get_temp()) + 1);
     double f4 = 0;
     if(q2 != 0 && q2 != q2_vals[q3]->get_len() - 1){
         f4 = input->get_value(which_term * num + p4_lows[q3] + q2 - 1);
@@ -1693,7 +1937,7 @@ double nu_e_collision_R2::F_comp(freqs_ntT* input, int which_term, int q2, int q
             f4 = exp(logy);
         }
     }
-    return ((check + 1) * f3 * f4 * (1 - f1) * (1 - f2) - check * f1 * f2 * (1 - f3) * (1 - f4));
+    return (abs(check - 1) * f3 * f4 * (1 - f1) * (1 - f2) + check * f1 * f2 * (1 - f3) * (1 - f4)); // + since check of 1 used to call F-
 }
 
 void nu_e_collision_R2::populate_F(freqs_ntT* input, int check){
@@ -1705,6 +1949,39 @@ void nu_e_collision_R2::populate_F(freqs_ntT* input, int check){
             for(int k = 0; k < 6; k++){
                 if(i < num3){
                     F_values[k][i][j] = F_comp(input, k, i, j, check);
+                } else {
+                    F_values[k][i][j] = 0;
+                }
+            }
+        }
+    }
+}
+
+double nu_e_collision_R2::F_comp_eq(freqs_ntT* input, int which_term, int q2, int q3, int check){
+    double p1_energy = eps->get_value(p1);
+    double q3_energy = q3_vals->get_value(q3);
+    double E3 = sqrt(pow(q3_energy, 2) + pow(scaled_me, 2));
+    double q2_energy = q2_vals[q3]->get_value(q2);
+    double E2 = sqrt(pow(q2_energy, 2) + pow(scaled_me, 2));
+    double p4_energy = p1_energy + E2 - E3;
+
+    double f1 = 1 / (exp(p1_energy) + 1);
+    double f2 = 1 / (exp(E2 * temp_cm / input->get_temp()) + 1);
+    double f3 = 1 / (exp(E3 * temp_cm / input->get_temp()) + 1);
+    double f4 = 1 / (exp(p4_energy) + 1);
+    
+    return (abs(check - 1) * f3 * f4 * (1 - f1) * (1 - f2) + check * f1 * f2 * (1 - f3) * (1 - f4)); // + since check of 1 used to call F-
+}
+
+void nu_e_collision_R2::populate_F_eq(freqs_ntT* input, int check){
+    int num = eps->get_len();
+    int size = q3_vals->get_len();
+    for(int i = 0; i < num + 2; i++){
+        for(int j = 0; j < size; j++){
+            int num3 = q2_vals[j]->get_len();
+            for(int k = 0; k < 6; k++){
+                if(i < num3){
+                    F_values[k][i][j] = F_comp_eq(input, k, i, j, check);
                 } else {
                     F_values[k][i][j] = 0;
                 }
@@ -2139,7 +2416,7 @@ double nu_e_collision_R2::inner_integral(int which_term, int q3){
     return result;
 }
 
-double nu_e_collision_R2::whole_integral(freqs_ntT* input, double a, double check, double* results){
+double nu_e_collision_R2::whole_integral(freqs_ntT* input, int check, double* results){
     if(p1_energy == 0){
         for(int i=0; i<6; i++){
             results[i] = 0;
@@ -2160,3 +2437,26 @@ double nu_e_collision_R2::whole_integral(freqs_ntT* input, double a, double chec
         }
     }
 }
+
+double nu_e_collision_R2::whole_integral_eq(freqs_ntT* input, int check, double* results){
+    if(p1_energy == 0){
+        for(int i=0; i<6; i++){
+            results[i] = 0;
+        }
+    } else {
+        //populate F values
+        this->populate_F_eq(input, check);
+        double q3_momentum = 0;
+        double E3 = 0;
+        for(int i = 0; i < 6; i++){
+            for(int q3=0; q3<q3_vals->get_len(); q3++){
+                q3_momentum = q3_vals->get_value(q3);
+                E3 = sqrt(pow(q3_momentum,2) + pow(scaled_me,2));
+                outer_vals->set_value(q3, (q3_momentum / E3) * inner_integral(i, q3));
+            }
+            results[i] = q3_vals->integrate(outer_vals);
+            results[i] *= pow(temp_cm, 5) / (pow(2,4) * pow(2*_PI_,3) * pow(p1_energy,2));
+        }
+    }
+}
+
