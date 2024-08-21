@@ -17,13 +17,19 @@ int main(int argc, char* argv[])
 {
     MPI_Init(&argc, &argv);
 
+    double ms = std::atof(argv[1]);
+    double tau_s = std::atof(argv[2]);
+    string folder = std::string(argv[3]);
+
+    double theta = 1.e-6 * sqrt(get_lifetime(ms, 1.e-6)*_hbar_/tau_s);
+
     double a_start = 0.1;
     double a_end = 10.00;
     int num = 51;
     int scale_num = 9;
     
-    double ms = 300;
-    double theta = 1.22e-5;
+//    double ms = 300;
+//    double theta = 1.22e-5;
     double time = 0;
     double temp = 1 / a_start;
 
@@ -55,6 +61,7 @@ int main(int argc, char* argv[])
 
     sim->set_ics(a_start, input, 0.01 * a_start);
 
+    /*
     string filename = "full-";
     string folder = "Run7";
     
@@ -72,7 +79,10 @@ int main(int argc, char* argv[])
         sim->inch_forward(scales->get_value(i), scales->get_value(i+1), folder, fn, true);
         
     }
+    */
     
+    string fn = "nunucoll-0";
+    sim->inch_forward(scales->get_value(0), scales->get_value(1), folder, fn, true);
     
         
     delete sim;

@@ -530,7 +530,6 @@ bool derivativesMPI::ODEOneRun(int N_step, int dN, double x_final, const std::st
         {
             for(int j = 0; j < dN; j++)
             {
-                cout << i << j << endl;
                 if(x_value + dx_value > x_final)
                     dx_value = x_final - x_value;
                 
@@ -729,6 +728,7 @@ void derivativesMPI::update(double new_a_start, double new_a_end){
         y_values->eps_shift(new_a_start, new_a_end);
     }
     
+    
     if (myid > 0)
     {
         freqs_ntT* eqm = new freqs_ntT(y_values);
@@ -753,14 +753,11 @@ void derivativesMPI::update(double new_a_start, double new_a_end){
             {
                 double abs_net = abs(dummy_ints[0][k] + dummy_ints[1][k]);
                 double FRS = (dummy_ints[0][k] - dummy_ints[1][k]);
-                if (FRS==0)
-                    cout << "**" << i << abs_net << y_values->get_eps_value(i) << endl;
                 if (abs_net == 0)
                     nu_nu_tolerances[i][k] = 0;
                 else
                     nu_nu_tolerances[i][k] = abs_net / FRS * 10.;
             }
-            cout << i << eqm->get_value(i) << "***" << nu_nu_tolerances[i][0] << ", " << y_values->get_eps_value(i) << endl;
         }
              
          delete eqm;   
@@ -845,7 +842,7 @@ bool derivativesMPI::inch_forward(double a0, double a1, string& folder_name, str
             cout << endl << "Time elapsed: "
              << duration.count()/1000. << " seconds" << endl;
             cout << "steps rejected / total steps = " << total_ODE_rejected_steps << " / " << total_ODE_steps << " (" << 100-(100 * total_ODE_rejected_steps) / (total_ODE_rejected_steps+total_ODE_steps) << "% efficiency)" << endl;
-    
+            cout << "Just decays rejected " << just_decays->get_rejected_steps() << " potential steps without calculating collisions." << endl;
         }
     }
     else
