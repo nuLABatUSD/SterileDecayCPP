@@ -58,6 +58,10 @@ class freqs_ntT : public dep_vars
     void compute_derivs(double, dummy_vars*, dummy_vars*, dummy_vars*, dummy_vars*, dummy_vars*, dummy_vars*, double*, double*, double*);
 
     dummy_vars* get_separations();
+    
+    void interp_extrap(double, double, double*);
+    void f_interpolate(double, int, double*);
+    void f_extrapolate(double, double*)
 };
 
 class integration
