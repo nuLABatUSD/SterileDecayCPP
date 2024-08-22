@@ -171,6 +171,9 @@ void derivatives::print_eps_file(const std::string& file_name)
         os << y_values->get_eps_value(i) << ", ";
     }
     os << y_values->get_eps_value(num_bins-1) << endl;
+    for (int i = 0; i < num_bins- 1; i++)
+        os << y_values->get_eps()->get_weight(i) << ", ";
+    os << y_values->get_eps()->get_weight(num_bins-1) << endl;
     
     os.close();
 }
@@ -223,6 +226,7 @@ bool derivatives::inch_forward(double a0, double a1, string& folder_name, string
             return false;
         }
         
+        //cout << y_values->get_neutrino_density(x_value) * pow(x_value, 4) << endl;
         print_csv(data_file);
     }    
     data_file.close();
