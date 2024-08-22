@@ -76,7 +76,7 @@ void freqs_ntT::eps_shift(double new_a_start, double new_a_end){
                 double new_x_val = new_eps->get_value(k);
                 int key_id = 0;
                 
-                while(eps->get_value(key_id) <= new_x_val){
+                while(eps->get_value(key_id) < new_x_val){
                     key_id++;
                 }
                 
@@ -95,8 +95,19 @@ void freqs_ntT::eps_shift(double new_a_start, double new_a_end){
                         key_id--;
                         break;
                 }
-                int ids[4] = {p * num_bins + key_id - 2, p * num_bins + key_id - 1, p * num_bins + key_id, p * num_bins + key_id + 1};
                 
+                double end = new_a_start * (sterile_mass / 2);
+                if(new_x_val > end){
+                    while(eps->get_value(key_id - 2) < end){
+                        key_id++;
+                    }
+                } else {
+                    while(eps->get_value(key_id + 1) > end){
+                        key_id--;
+                    }
+                }
+                
+                int ids[4] = {p * num_bins + key_id - 2, p * num_bins + key_id - 1, p * num_bins + key_id, p * num_bins + key_id + 1};
                 
                 
                 if(key_id + 1 >= num_bins){
@@ -570,7 +581,7 @@ dummy_vars* freqs_ntT::get_separations(){
     dummy_vars* reduced = new dummy_vars(index - num_switches + 1);
     reduced->set_value(index - num_switches, a_end);
     for(int i = 0; i < index - num_switches; i++){
-        reduced->set_value(i, overfull->get_value(i + 10 * num_bins - index + num_switches));
+        reduced->set_value(i, overfull->get_value(i + num_switches));
     }
     delete overfull;
     return reduced;

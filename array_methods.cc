@@ -407,7 +407,7 @@ gel_linspace_gl::gel_linspace_gl(double lin_sm, double max_lin, int num):dummy_v
         weights[i] = wvals_5[i - num_gel - num_lin] * exp(xvals_5[i - num_gel - num_lin]);
     }
     
-
+    
     
 }
 
