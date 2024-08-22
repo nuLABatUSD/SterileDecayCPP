@@ -49,6 +49,8 @@ class ODESolve
         ODESolve();
         ~ODESolve();
         
+        int get_rejected_steps();
+        
         void set_ics(double, dep*, double);
         void print_state();
         void print_csv(ostream&);
@@ -90,6 +92,10 @@ void ODESolve<dep>::set_ics(double x0, dep* y0, double dx0)
     y_values->copy(y0);
     dx_value = dx0;
 }
+
+template <class dep>
+int ODESolve<dep>::get_rejected_steps()
+{   return total_ODE_rejected_steps; }
 
 template <class dep>
 void ODESolve<dep>::print_state()
