@@ -101,11 +101,14 @@ void freqs_ntT::eps_shift(double new_a_start, double new_a_end){
                     while(eps->get_value(key_id - 2) < end){
                         key_id++;
                     }
+                    key_id++;
                 } else {
                     while(eps->get_value(key_id + 1) > end){
                         key_id--;
                     }
                 }
+                
+                
                 
                 int ids[4] = {p * num_bins + key_id - 2, p * num_bins + key_id - 1, p * num_bins + key_id, p * num_bins + key_id + 1};
                 
