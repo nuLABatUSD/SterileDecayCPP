@@ -344,14 +344,14 @@ void derivatives::f(double a, freqs_ntT* inputs, freqs_ntT* derivs){
 int main(){
     /*
     * These four terms and E_low and E_high are constrained in order for our dummy_vars object to function as intended. In particular, we 
-    * must obey the inequality scales_num >= floor[log( a_end / a_start ) / log(E_low * (num - 11) / E_high) + 2]
+    * must obey the inequality scales_num >= floor[log( a_end / a_start ) / log(E_low * (num - 16) / E_high) + 2]
     */
     double a_start = 0.1;
     double a_end = 0.25;
     int num = 100;
     int scale_num = 3;
     
-    double ms = 300;
+    double ms = 245;
     double theta = 1.22e-5;
     double time = 0;
     double temp = 1 / a_start;
@@ -361,7 +361,7 @@ int main(){
     temp = 1/a;
     
     double E_low = min_low(ms);
-    double E_high = (ms + 10) / 2;
+    double E_high = (ms) / 2;
     int file_idx = 0;
 
     dummy_vars* scales = new dummy_vars(scale_num);
@@ -499,11 +499,12 @@ int main(){
 
     sim->set_ics(a_start, input, 0.01 * a_start);
     dummy_vars* a_separations = sim->retrieve_separations();
+    a_separations->print_all();
     for(int i = 0; i < a_separations->get_len(); i++){
         double a = a_separations->get_value(i);
         cout << a << endl;
         string name = "oua" + to_string(file_idx) + ".csv";
-        file_idx++; 
+        file_idx++;
         sim->run(100, 2, a, name);
         if(i != a_separations->get_len() - 1){
             sim->shift_x();

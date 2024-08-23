@@ -318,11 +318,11 @@ double min_low(double sterile_mass){
 
     // type I accounting
     double minimum = get_monoenergy(sterile_mass, 0, _neutral_pion_mass_);
-
+    
     // type II accounting
     double neutrino_energy_pion = get_monoenergy(_charged_pion_mass_, 0, _muon_mass_);
     double min_energy_e = *gamma_pion_e * neutrino_energy_pion * (1 - *pion_speed_e);
-
+    
     if(sterile_mass > _charged_pion_mass_ + _electron_mass_ && min_energy_e < minimum){
         minimum = min_energy_e;
     }
