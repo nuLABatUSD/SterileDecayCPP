@@ -60,7 +60,7 @@ class gel_linspace_gl : public dummy_vars
     protected:
     const int default_N_gel = 10;
     const int default_N_gl = 5;
-    const double max_lin_sm = 10.0;
+    const double max_lin_sm = 20.0;
     
     int num_gel;
     int num_lin;

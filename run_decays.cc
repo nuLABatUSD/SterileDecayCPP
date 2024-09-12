@@ -38,7 +38,7 @@ int main(int argc, char* argv[]){
 
     double a_start = 0.1;
     double a_end = 10.00;
-    int num = 51;
+    int num = 101;
     int scale_num = 9;
     
    // double ms = 300;

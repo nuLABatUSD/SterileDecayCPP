@@ -13,6 +13,9 @@ class freqs_ntT : public dep_vars
     gel_linspace_gl* eps;
     double sterile_mass;
     double mixing_angle;
+    
+    double delta_decays[2];
+    const double spike_dip = 3.0;
 
     public:
 
@@ -60,8 +63,8 @@ class freqs_ntT : public dep_vars
     dummy_vars* get_separations();
     
     void interp_extrap(double, double, double*);
-    void f_interpolate(double, int, double*);
-    void f_extrapolate(double, double*)
+    void f_interpolate(double, int, int, double*);
+    void f_extrapolate(double, double*);
 };
 
 class integration

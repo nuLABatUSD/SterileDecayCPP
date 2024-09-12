@@ -17,6 +17,7 @@ int main(int argc, char* argv[])
 {
     MPI_Init(&argc, &argv);
 
+
     double ms = std::atof(argv[1]);
     double tau_s = std::atof(argv[2]);
     string folder = std::string(argv[3]);
@@ -25,9 +26,9 @@ int main(int argc, char* argv[])
 
     double a_start = 0.1;
     double a_end = 10.00;
-    int num = 51;
+    int num = 101;
     int scale_num = 9;
-    
+
 //    double ms = 300;
 //    double theta = 1.22e-5;
     double time = 0;
@@ -36,6 +37,7 @@ int main(int argc, char* argv[])
     double E_low = min_low(ms);
     double E_high = (ms + 10) / 2;
     
+
     dummy_vars* scales = new dummy_vars(scale_num);
     seek_as(a_start, a_end, scales);
 
@@ -55,23 +57,32 @@ int main(int argc, char* argv[])
         freqs->set_value(i + 5 * num, f);
     }
 
+//    cout << eps->get_value(10) << endl;
     double ns =  (3 * _zeta_3_ / (2 * pow(_PI_,2))) * _gwd_ * pow(10,3) / _gsdec_;
     freqs_ntT* input = new freqs_ntT(num, E_low, E_high, a_low, a_high, ms, theta, freqs, ns, time, temp);
     derivativesMPI* sim = new derivativesMPI(num, E_low, E_high, a_low, a_high, ms, theta, freqs, ns, time, temp);
 
     sim->set_ics(a_start, input, 0.01 * a_start);
 
-    /*
-    string filename = "full-";
-    string folder = "Run7";
+    
+ //   string filename = "full-";
+//    string folder = "Run7";
     
 //    cout << "Solving FULL with m_s = " << ms << " MeV and lifetime " << tau_s << "s from T_cm = " << 1/scales->get_value(0) << " MeV to T_cm = " << 1/scales->get_value(scale_num-1) << " MeV" << endl;
+  
+    string fn = "nunucoll-0";
+    sim->update(scales->get_value(0), scales->get_value(1));
+    sim->inch_forward(scales->get_value(0), scales->get_value(1), folder, fn, true);
     
-    for(int i = 0; i < scale_num - 1; i++)
+/*    for(int i = 0; i < scale_num - 1; i++)
     {
         sim->update(scales->get_value(i), scales->get_value(i+1));
+        
+        string fn= filename + to_string(i);
+        sim->inch_forward(scales->get_value(i), scales->get_value(i+1), folder, fn, true);
     }
-    
+*/   
+    /*
     for (int i = 0; i < scale_num -1; i++)
     {
         
@@ -79,11 +90,11 @@ int main(int argc, char* argv[])
         sim->inch_forward(scales->get_value(i), scales->get_value(i+1), folder, fn, true);
         
     }
-    */
+    
     
     string fn = "nunucoll-0";
     sim->inch_forward(scales->get_value(0), scales->get_value(1), folder, fn, true);
-    
+    */
         
     delete sim;
     delete input;

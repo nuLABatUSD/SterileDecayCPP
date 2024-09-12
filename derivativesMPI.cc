@@ -32,7 +32,7 @@ derivativesMPI::derivativesMPI(int num, double low, double high, double start, d
     a_end = end;
     sterile_mass = ms;
     mixing_angle = theta;
-
+    
     y_values = new freqs_ntT(num, E_low, E_high, a_start, a_end, sterile_mass, mixing_angle, freqs, ns, time, temp);
 
     just_decays = new derivatives(num, low, high, start, end, ms, theta, freqs, ns, time, temp);
@@ -49,11 +49,12 @@ derivativesMPI::derivativesMPI(int num, double low, double high, double start, d
             for(int k = 0; k < 6; k++)
                 eqm->set_value(j + k * num_bins, f);
         }
+        
         for(int i = myid-1; i < num_bins; i += numprocs - 1)
         {
             nu_nu_coll_objects[i] = new integration(y_values->get_eps(), i);
             nu_nu_tolerances[i] = new double[6];
-            
+                        
             double dummy_ints[3][6];
             for(int j = 0; j < 2; j++)
                 nu_nu_coll_objects[i]->whole_integral(eqm, a_start, j, dummy_ints[j]);
@@ -67,6 +68,8 @@ derivativesMPI::derivativesMPI(int num, double low, double high, double start, d
                 else
                     nu_nu_tolerances[i][k] = abs_net / FRS * 10.;
             }
+            
+          //  cout << 1/a_start << "** " << y_values->get_eps_value(i) << ", " << nu_nu_tolerances[i][0] << endl;
         }
         
         delete eqm;
@@ -757,7 +760,9 @@ void derivativesMPI::update(double new_a_start, double new_a_end){
                     nu_nu_tolerances[i][k] = 0;
                 else
                     nu_nu_tolerances[i][k] = abs_net / FRS * 10.;
+                    
             }
+           // cout << 1/a_start << "** " << y_values->get_eps_value(i) << ", " << nu_nu_tolerances[i][0] << endl;
         }
              
          delete eqm;   

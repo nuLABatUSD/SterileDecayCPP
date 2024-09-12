@@ -22,6 +22,9 @@ freqs_ntT::freqs_ntT(int num, double low, double high, double start, double end,
     sterile_mass = ms;
     mixing_angle = theta;
 
+    delta_decays[0] = get_monoenergy(sterile_mass, 0., _neutral_pion_mass_);
+    delta_decays[1] = get_monoenergy(sterile_mass, 0., 0.);
+
     for(int i = 0; i < num; i++){
         values[i] = freqs->get_value(i);
         values[i + num] = freqs->get_value(i + num);
@@ -47,6 +50,9 @@ freqs_ntT::freqs_ntT(freqs_ntT* copy_me):dep_vars(6 * copy_me->get_num_bins() + 
     eps = new gel_linspace_gl(copy_me->get_eps());
 //    eps = new gel_linspace_gl(E_low * a_start, E_high * a_end, num_bins);
 
+    delta_decays[0] = get_monoenergy(sterile_mass, 0., _neutral_pion_mass_);
+    delta_decays[1] = get_monoenergy(sterile_mass, 0., 0.);
+
     for(int i = 0; i < 6 * num_bins + 3; i++){
         values[i] = copy_me->get_value(i);
     }
@@ -61,12 +67,32 @@ void freqs_ntT::eps_shift(double new_a_start, double new_a_end){
     this->set_a_start(new_a_start);
     this->set_a_end(new_a_end);
     gel_linspace_gl* new_eps = new gel_linspace_gl(E_low * new_a_start, E_high * new_a_end, num_bins);
+    
+    double** new_vals = new double*[num_bins];
+        
+    for (int i = 0; i < num_bins; i++)
+    {
+        new_vals[i] = new double[6];
+        interp_extrap(new_eps->get_value(i), 1./a_start, new_vals[i]);
+    }
+    for (int i = 0; i < num_bins; i++)
+    {    
+        for (int j = 0; j < 6; j++)
+            values[j * num_bins + i] = new_vals[i][j];
+        delete[] new_vals[i];
+    }
+    delete[] new_vals;
+    
+    
     // known points are in eps, target point in new_eps
-    double* freqs_ntT = new double[6 * num_bins + 3];
+    /*double* freqs_ntT = new double[6 * num_bins + 3];
     for(int i = 0; i < 6 * num_bins; i++){
         freqs_ntT[i] = values[i];
     }
+    */
     
+    
+    /*
     int index_gl_begin = eps->get_len() - eps->get_gl();
     
     for(int p = 0; p < 6; p++){
@@ -163,9 +189,11 @@ void freqs_ntT::eps_shift(double new_a_start, double new_a_end){
             }
         }
     }
+    
+    */
     delete eps;
     eps = new_eps;
-    delete[] freqs_ntT;
+    //delete[] freqs_ntT;
 }
 
 double freqs_ntT::get_eps_value(int index){
@@ -691,6 +719,10 @@ double integration::Fvv_comp(freqs_ntT* input, bool neutrino, int which_term, in
     double f2 = 0;
     double f3 = 0;
     double f4 = 0;
+    double f3_dummy = 0;
+    
+    double interp_results[6];
+
     for(int k = 0; k < 3; k++){
         if(neutrino){
             k_mod = 2 * k;
@@ -707,7 +739,14 @@ double integration::Fvv_comp(freqs_ntT* input, bool neutrino, int which_term, in
         if(p3 < p3_vals[p2]->get_len() - 1){
             f3 = input->get_value(which_term * num + p3);
         } else {
-            if(p3_energy <= eps->get_value(num)){
+                input->interp_extrap(p3_energy, 0.1, interp_results);
+                f3 = interp_results[which_term];
+        
+          //  if(k == 0)
+            //    cout << p3_energy << ", " << f3_dummy << endl;
+        
+        
+          /*  if(p3_energy <= eps->get_value(num)){
                 double new_val = 0;
                 int ids[4] = {which_term * num + count - 2, which_term * num + count - 1, which_term * num + count, which_term * num + count + 1};
                 if(p3 + 1 >= num){
@@ -743,12 +782,20 @@ double integration::Fvv_comp(freqs_ntT* input, bool neutrino, int which_term, in
 
                 double logy = ((p3_energy - old_eps1) * (log(old_f2) - log(old_f1)) / (old_eps2 - old_eps1)) + log(old_f1);
                 f3 = exp(logy);
-            }
+           } 
+           */
+ //          f3 = f3_dummy;
+//        if(k == 2)
+  //          cout << "*" << p3_energy << ", " << f3 << ", " << f3_dummy << endl;
         }
 
 
         // interpolation / extrapolation for p4
-        f4 = 0;
+        
+        input->interp_extrap(p4_energy, 0.1, interp_results);
+        f4 = interp_results[k_mod];
+        
+/*        
         if(eps->get_value(num - 1) >= p4_energy){
             int p4 = 0;
             for(int j = 0; j < num; j++){
@@ -792,6 +839,9 @@ double integration::Fvv_comp(freqs_ntT* input, bool neutrino, int which_term, in
             double logy = ((p4_energy - old_eps1) * (log(old_f2) - log(old_f1)) / (old_eps2 - old_eps1)) + log(old_f1);
             f4 = exp(logy);
         }
+        
+*/        
+        
         F += s_mod * (abs(check - 1) * f3 * f4 * (1 - f1) * (1 - f2) - check * f1 * f2 * (1 - f3) * (1 - f4));
     }
     return F;
@@ -830,6 +880,8 @@ double integration::Fvvbar_comp(freqs_ntT* input, bool neutrino, int which_term,
     double f2 = 0;
     double f3 = 0;
     double f4 = 0;
+    
+    double interp_results[6];
 
     int v1;
     int v2;
@@ -873,6 +925,10 @@ double integration::Fvvbar_comp(freqs_ntT* input, bool neutrino, int which_term,
                 if(p3 < p3_vals[p2]->get_len() - 1){
                     f3 = input->get_value(v3 * num + p3);
                 } else {
+                input->interp_extrap(p3_energy, 0.1, interp_results);
+              f3 = interp_results[which_term];
+                
+/*                
                     if(p3_energy <= eps->get_value(num)){
                         double new_val = 0;
                         int ids[4] = {v3 * num + count - 2, v3 * num + count - 1, v3 * num + count, v3 * num + count + 1};
@@ -909,12 +965,15 @@ double integration::Fvvbar_comp(freqs_ntT* input, bool neutrino, int which_term,
 
                         double logy = ((p3_energy - old_eps1) * (log(old_f2) - log(old_f1)) / (old_eps2 - old_eps1)) + log(old_f1);
                         f3 = exp(logy);
-                    }
-                }
+                    }*/
+                } 
 
 
                 // interpolation / extrapolation for p4
-                if(eps->get_value(num - 1) >= p4_energy){
+                input->interp_extrap(p4_energy, 0.1, interp_results);
+                f4 = interp_results[which_term];
+
+/*                if(eps->get_value(num - 1) >= p4_energy){
                     int p4 = 0;
                     for(int j = 0; j < num; j++){
                         if(eps->get_value(j) < p4_energy){
@@ -958,7 +1017,7 @@ double integration::Fvvbar_comp(freqs_ntT* input, bool neutrino, int which_term,
 
                     double logy = ((p4_energy - old_eps1) * (log(old_f2) - log(old_f1)) / (old_eps2 - old_eps1)) + log(old_f1);
                     f4 = exp(logy);
-                }
+                }*/
                 F += s_mod * (abs(check - 1) * f3 * f4 * (1 - f1) * (1 - f2) - check * f1 * f2 * (1 - f3) * (1 - f4));
             }
         }
